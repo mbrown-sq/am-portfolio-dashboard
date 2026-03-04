@@ -891,6 +891,77 @@ function velocityBadge(vel) {
   return '<span class="vel-badge stable">~' + vel.toFixed(0) + '%</span>';
 }
 
+
+function sellerNarrative(a) {
+  var parts = [];
+  
+  // Identity & tenure
+  var catLabel = {food:'food & beverage',retail:'retail',beauty:'beauty & wellness',services:'services',fitness:'fitness',events:'events',drinks:'drinks & café'}[a.cat] || a.cat;
+  var tenureYrs = a.tenure > 0 ? (a.tenure/12).toFixed(1) : '?';
+  var locStr = a.locations > 1 ? 'a multi-location ' + catLabel + ' group with ' + a.locations + ' sites' : 'a ' + catLabel + ' business';
+  parts.push(a.name + ' is ' + locStr + ' that\'s been with Square for ' + tenureYrs + ' years.');
+  
+  // Performance & peer context
+  var rankStr = a.peerRank >= 75 ? 'in the top ' + (100-a.peerRank) + '% of ' + a.cat + ' sellers by GPV' :
+                a.peerRank >= 50 ? 'above the median for ' + a.cat + ' sellers' :
+                a.peerRank >= 25 ? 'below the median for ' + a.cat + ' sellers — potential to grow' :
+                'in the bottom quartile for ' + a.cat + ' — may need support or review';
+  parts.push('They\'re ' + rankStr + '.');
+  
+  // Velocity
+  if (a.velocity > 15) parts.push('Business is accelerating strongly (+' + a.velocity.toFixed(0) + '% velocity) — a good time to discuss growth tools.');
+  else if (a.velocity > 5) parts.push('Showing healthy growth momentum (+' + a.velocity.toFixed(0) + '% velocity).');
+  else if (a.velocity < -15) parts.push('⚠ Volume is declining significantly (' + a.velocity.toFixed(0) + '% velocity) — worth a check-in to understand what\'s changed.');
+  else if (a.velocity < -5) parts.push('Volume is softening (' + a.velocity.toFixed(0) + '% velocity) — keep an eye on this.');
+  
+  // Product adoption
+  var prods = a.products.filter(function(p){ return p && p !== 'UNKNOWN' && p !== 'Register POS' && p !== 'Register Terminal'; });
+  if (prods.length >= 4) parts.push('Strong product adoption with ' + prods.length + ' active products including ' + prods.slice(0,3).join(', ') + '.');
+  else if (prods.length >= 1) parts.push('Currently using ' + prods.join(', ') + '.');
+  else parts.push('No SaaS or add-on products adopted yet — entirely on free POS. This is a blank canvas for product conversations.');
+  
+  // Product gap insight based on category
+  var hasOnline = prods.indexOf('Square Online Store') >= 0 || prods.indexOf('Square Online Checkout') >= 0;
+  var hasLoyalty = prods.indexOf('Loyalty') >= 0;
+  var hasMarketing = prods.indexOf('Marketing') >= 0 || prods.indexOf('Text Message Marketing') >= 0;
+  var hasInvoices = prods.indexOf('Invoices') >= 0;
+  var hasAppts = prods.indexOf('Appointments') >= 0 || prods.indexOf('Appointments Plus') >= 0;
+  
+  if (a.cat === 'food' && !hasOnline) parts.push('💡 Most food sellers at this tier use Online Store — could help capture delivery/pickup orders.');
+  if (a.cat === 'food' && !hasLoyalty && a.gpv > 0.5) parts.push('💡 Loyalty programs drive repeat visits — strong fit for food businesses above A$500K GPV.');
+  if (a.cat === 'retail' && !hasOnline) parts.push('💡 Retail sellers without an online presence are missing omnichannel revenue — Online Store is a natural fit.');
+  if (a.cat === 'beauty' && !hasAppts) parts.push('💡 Appointments is the #1 product for beauty & wellness — reduces no-shows and streamlines booking.');
+  if (a.cat === 'services' && !hasInvoices) parts.push('💡 Services businesses often benefit from Invoices for quoting and billing.');
+  if (!hasMarketing && a.gpv > 1.0) parts.push('💡 At this GPV level, Marketing tools (email/SMS) can drive measurable repeat business.');
+  
+  // Contract & DM context
+  if (a.contract) parts.push('📋 This is a contract account — renewal conversations are key touchpoints.');
+  if (a.days >= 180) parts.push('🔴 No DM in 180+ days — approaching release from your book. Prioritize outreach.');
+  else if (a.days >= 120) parts.push('🟡 Last DM was ' + a.days + ' days ago — schedule a check-in before the 6-month window.');
+  
+  // Avg ticket insight
+  if (a.avgTicket > 100 && a.cat === 'food') parts.push('High avg ticket (A$' + a.avgTicket.toFixed(0) + ') for food suggests catering, events, or premium dining.');
+  if (a.avgTicket < 10 && a.avgTicket > 0) parts.push('Very low avg ticket (A$' + a.avgTicket.toFixed(2) + ') — high-volume micro-transactions, hardware reliability matters.');
+  
+  return parts.join(' ');
+}
+
+// Milestone detection
+function sellerMilestones(a) {
+  var milestones = [];
+  if (a.tenure === 12) milestones.push({icon:'🎂', text:'1-year anniversary with Square!'});
+  if (a.tenure === 24) milestones.push({icon:'🎂', text:'2-year anniversary with Square!'});
+  if (a.tenure === 36) milestones.push({icon:'🎉', text:'3-year anniversary with Square!'});
+  if (a.tenure === 48) milestones.push({icon:'🎉', text:'4-year anniversary with Square!'});
+  if (a.tenure === 60) milestones.push({icon:'🏆', text:'5-year anniversary with Square!'});
+  if (a.tenure > 60 && a.tenure % 12 === 0) milestones.push({icon:'🏆', text:(a.tenure/12) + '-year anniversary with Square!'});
+  if (a.gpv >= 1.0 && a.gpv9 < 1.0) milestones.push({icon:'📈', text:'GPV just crossed A$1M annualized!'});
+  if (a.gpv >= 5.0 && a.gpv9 < 5.0) milestones.push({icon:'🚀', text:'GPV just crossed A$5M annualized!'});
+  if (a.velocity > 20) milestones.push({icon:'⚡', text:'Fastest growing period — volume up ' + a.velocity.toFixed(0) + '%'});
+  if (a.products.filter(function(p){return p && p!=='UNKNOWN' && p!=='Register POS' && p!=='Register Terminal';}).length >= 5) milestones.push({icon:'🌟', text:'Power user — 5+ Square products adopted'});
+  return milestones;
+}
+
 function peerBenchmarkHtml(a) {
   const max = a.peerMax || 1;
   const youPct = Math.min((a.gpv / max) * 100, 100);
@@ -1022,6 +1093,14 @@ function toggleDetail(idx) {
       '<div class="detail-tag"><i class="fas fa-phone"></i>'+a.activities30d+' activities (30d)</div>' +
       '<div class="detail-tag"><i class="fas fa-star"></i><span class="stars">'+starsHtml+'</span></div>' +
       '<div class="detail-tag"><i class="fas fa-chart-line"></i>YoY '+(a.yoy>=0?'+':'')+a.yoy+'%</div>' +
+    '</div>' +
+    (function(){
+      var ms = sellerMilestones(a);
+      return ms.length ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;">' + ms.map(function(m){return '<span style="font-size:10px;background:var(--blue-dim);color:var(--blue-light);padding:3px 10px;border-radius:12px;font-weight:600;">'+m.icon+' '+m.text+'</span>';}).join('') + '</div>' : '';
+    })() +
+    '<div style="background:var(--bg2);border-radius:6px;padding:12px;margin:8px 0;border-left:3px solid var(--blue);">' +
+      '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;"><i class="fas fa-lightbulb" style="color:var(--yellow);margin-right:4px;"></i>Know Your Seller</div>' +
+      '<div style="font-size:11px;color:var(--text);line-height:1.6;">' + sellerNarrative(a) + '</div>' +
     '</div>' +
     '<div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap;">' +
       '<div style="flex:1;min-width:200px;background:var(--bg2);border-radius:6px;padding:10px;">' +
