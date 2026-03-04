@@ -9,7 +9,7 @@
 ## Quick Start
 
 **Live site:** GitHub Pages (pushes to `main` auto-deploy, live within ~60 seconds)
-**Repo:** https://github.com/mbrown-sq/am-portfolio-dashboard
+**Repo:** https://github.com/squareup/ausmbapp
 **Local path:** `/Users/mbrown/Projects/am-portfolio-dashboard/`
 
 ```
