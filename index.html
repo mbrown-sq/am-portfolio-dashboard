@@ -904,8 +904,8 @@ function toggleDetail(idx) {
       '<div>'+sparkLarge+'</div>' +
     '</div>' +
     '<div class="detail-grid">' +
-      '<div class="detail-metric"><div class="detail-metric-label">Annualized GPV</div><div class="detail-metric-value" style="color:var(--blue-light);">A$'+a.gpv.toFixed(1)+'M</div></div>' +
-      '<div class="detail-metric"><div class="detail-metric-label">Annualized AR</div><div class="detail-metric-value">A$'+(a.ar/1000).toFixed(0)+'K</div></div>' +
+      '<div class="detail-metric"><div class="detail-metric-label">Annualized GPV</div><div class="detail-metric-value" style="color:var(--blue-light);">A$'+(a.gpv*1000000).toLocaleString('en-AU',{maximumFractionDigits:0})+'</div></div>' +
+      '<div class="detail-metric"><div class="detail-metric-label">Annualized AR</div><div class="detail-metric-value">A$'+(a.ar).toLocaleString('en-AU',{maximumFractionDigits:0})+'</div></div>' +
       '<div class="detail-metric"><div class="detail-metric-label">Avg Ticket</div><div class="detail-metric-value">A$'+(a.avgTicket||0).toFixed(2)+'</div></div>' +
       '<div class="detail-metric"><div class="detail-metric-label">Active Locations</div><div class="detail-metric-value">'+a.locations+'</div></div>' +
     '</div>' +
