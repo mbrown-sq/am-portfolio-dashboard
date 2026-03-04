@@ -9,14 +9,30 @@
 ## Quick Start
 
 **Live site:** GitHub Pages (pushes to `main` auto-deploy, live within ~60 seconds)
-**Repo:** https://github.com/squareup/ausmbapp
 **Local path:** `/Users/mbrown/Projects/am-portfolio-dashboard/`
 
+### Git Remotes (two repos)
+| Remote | Repo | Purpose |
+|--------|------|---------|
+| `origin` | https://github.com/mbrown-sq/am-portfolio-dashboard | **Daily workflow** — push directly to `main`, auto-deploys to GitHub Pages |
+| `org` | https://github.com/squareup/ausmbapp | Team/org visibility — has branch protection, requires PRs |
+
+### Day-to-day workflow (use `origin`)
 ```
 cd /Users/mbrown/Projects/am-portfolio-dashboard
 # Edit files
 git add -A && git commit -m "description" && git push origin main
 # Live within ~60 seconds
+```
+
+### Syncing to org repo (occasional, requires PR)
+```
+git push org main
+# This will fail with branch protection — create a PR instead:
+git checkout -b my-branch-name
+git push org my-branch-name
+# Then create PR at https://github.com/squareup/ausmbapp/pulls
+git checkout main
 ```
 
 **Related docs:**
