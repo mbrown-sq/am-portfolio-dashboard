@@ -1026,58 +1026,112 @@ function nextBestActionsHtml(a) {
 }
 
 function sellerNarrative(a) {
-  var parts = [];
+  var sections = [];
   
-  // Identity & tenure
-  var catLabel = {food:'food & beverage',retail:'retail',beauty:'beauty & wellness',services:'services',fitness:'fitness',events:'events',drinks:'drinks & café'}[a.cat] || a.cat;
-  var tenureYrs = a.tenure > 0 ? (a.tenure/12).toFixed(1) : '?';
-  var locStr = a.locations > 1 ? 'a multi-location ' + catLabel + ' group with ' + a.locations + ' sites' : 'a ' + catLabel + ' business';
-  var geoStr = a.city ? ' based in ' + a.city + (a.state ? ', ' + a.state : '') : '';
-  parts.push(a.name + ' is ' + locStr + geoStr + ' that\'s been with Square for ' + tenureYrs + ' years.');
+  // === WHO THEY ARE ===
+  var catLabel = {food:'food & beverage',retail:'retail',beauty:'beauty & wellness',services:'services',fitness:'fitness',events:'events',drinks:'café & drinks'}[a.cat] || a.cat;
+  var gpvExact = (a.gpv * 1000000);
+  var gpvStr = gpvExact >= 1000000 ? 'A$' + (gpvExact/1000000).toFixed(2) + 'M' : 'A$' + (gpvExact/1000).toFixed(0) + 'K';
+  var arStr = a.ar >= 1000 ? 'A$' + (a.ar/1000).toFixed(1) + 'K' : 'A$' + a.ar.toFixed(0);
+  var ticketStr = 'A$' + (a.avgTicket||0).toFixed(2);
   
-  // Performance & peer context
-  var rankStr = a.peerRank >= 75 ? 'in the top ' + (100-a.peerRank) + '% of ' + a.cat + ' sellers by GPV' :
-                a.peerRank >= 50 ? 'above the median for ' + a.cat + ' sellers' :
-                a.peerRank >= 25 ? 'below the median for ' + a.cat + ' sellers — potential to grow' :
-                'in the bottom quartile for ' + a.cat + ' — may need support or review';
-  parts.push('They\'re ' + rankStr + '.');
+  // Business model inference from avg ticket + category
+  var modelInference = '';
+  if (a.cat === 'food' && a.avgTicket < 15) modelInference = 'Their avg ticket of ' + ticketStr + ' points to a high-frequency counter-service model (café, bakery, quick-service) — speed and reliability at the register matter most.';
+  else if (a.cat === 'food' && a.avgTicket >= 15 && a.avgTicket < 40) modelInference = 'At ' + ticketStr + ' avg ticket, this looks like a casual dining operation — table turnover and order management are key.';
+  else if (a.cat === 'food' && a.avgTicket >= 40) modelInference = 'A ' + ticketStr + ' avg ticket suggests premium dining, catering, or events — high-touch service where presentation and experience matter.';
+  else if (a.cat === 'retail' && a.avgTicket < 30) modelInference = 'Low avg ticket (' + ticketStr + ') suggests high-volume convenience or impulse retail — checkout speed and inventory management are priorities.';
+  else if (a.cat === 'retail' && a.avgTicket >= 30) modelInference = 'At ' + ticketStr + ' avg ticket, this is a considered-purchase retailer — product knowledge, customer relationships, and omnichannel matter.';
+  else if (a.cat === 'beauty') modelInference = 'At ' + ticketStr + ' per service, ' + (a.avgTicket > 80 ? 'this is a premium salon/clinic — client retention and rebooking rates drive the business.' : 'booking efficiency and reducing no-shows directly impact revenue.');
+  else if (a.cat === 'services') modelInference = 'Avg ticket of ' + ticketStr + ' — ' + (a.avgTicket > 100 ? 'this is a high-value services business where quoting accuracy and invoicing matter.' : 'a volume services operation where scheduling and payment simplicity drive efficiency.');
+  else if (a.avgTicket > 0) modelInference = 'Avg transaction is ' + ticketStr + '.';
   
-  // Velocity
-  if (a.velocity > 15) parts.push('Business is accelerating strongly (+' + a.velocity.toFixed(0) + '% velocity) — a good time to discuss growth tools.');
-  else if (a.velocity > 5) parts.push('Showing healthy growth momentum (+' + a.velocity.toFixed(0) + '% velocity).');
-  else if (a.velocity < -15) parts.push('⚠ Volume is declining significantly (' + a.velocity.toFixed(0) + '% velocity) — worth a check-in to understand what\'s changed.');
-  else if (a.velocity < -5) parts.push('Volume is softening (' + a.velocity.toFixed(0) + '% velocity) — keep an eye on this.');
+  // Location context
+  var locContext = '';
+  if (a.locations > 3) locContext = 'With ' + a.locations + ' active locations' + (a.city ? ' based around ' + a.city : '') + ', they\'re operating at chain scale — consistency across sites, centralised reporting, and multi-location management are likely pain points.';
+  else if (a.locations > 1) locContext = a.locations + ' locations' + (a.city ? ' in the ' + a.city + ' area' : '') + ' — they\'re growing beyond a single site, which means they\'ll start needing tools that work across locations.';
+  else if (a.city) locContext = 'Single location in ' + a.city + (a.state ? ', ' + a.state : '') + '.';
   
-  // Product adoption
+  var identityLine = '<strong>' + a.name + '</strong> is a ' + catLabel + ' business' + (a.tenure > 0 ? ' that\'s been with Square for <strong>' + (a.tenure/12).toFixed(1) + ' years</strong>' : '') + '.';
+  sections.push(identityLine + ' ' + locContext);
+  
+  // === THE NUMBERS THAT MATTER ===
+  var numbersLines = [];
+  
+  // GPV with context
+  var peerPct = 100 - a.peerRank;
+  if (peerPct <= 5) numbersLines.push('They\'re processing <strong>' + gpvStr + ' annually</strong> — that puts them in the <strong>top ' + peerPct + '%</strong> of all ' + a.cat + ' sellers in your portfolio. This is one of your most valuable accounts.');
+  else if (peerPct <= 25) numbersLines.push('At <strong>' + gpvStr + ' annual GPV</strong>, they\'re in the top quarter of ' + a.cat + ' sellers (top ' + peerPct + '%). A strong performer worth investing time in.');
+  else if (a.peerRank < 50) numbersLines.push('Processing <strong>' + gpvStr + ' annually</strong> — below the median for ' + a.cat + ' sellers. There may be room to grow if they\'re splitting volume with another provider.');
+  else numbersLines.push('At <strong>' + gpvStr + ' annual GPV</strong>, they\'re in the lower half of ' + a.cat + ' sellers. Worth understanding if this is their full volume or if they\'re using another provider too.');
+  
+  // Revenue
+  numbersLines.push('They\'re generating <strong>' + arStr + ' in annual revenue</strong> for Square.');
+  
+  // Velocity with REAL numbers
+  if (a.gpv9 && a.gpv) {
+    var gpv9Str = (a.gpv9 * 1000000) >= 1000000 ? 'A$' + (a.gpv9).toFixed(2) + 'M' : 'A$' + (a.gpv9*1000).toFixed(0) + 'K';
+    if (a.velocity > 15) numbersLines.push('<span style="color:var(--green);">📈 <strong>Growing fast.</strong></span> Their trailing 9-month GPV is <strong>' + gpv9Str + '</strong> vs <strong>' + gpvStr + '</strong> annualised — that\'s <strong>+' + a.velocity.toFixed(0) + '% acceleration</strong>. They\'re likely expanding (new location? more customers? higher prices?) — ask what\'s driving it and how you can support the momentum.');
+    else if (a.velocity > 5) numbersLines.push('<span style="color:var(--green);">📈 Healthy growth.</span> 9-month trailing at <strong>' + gpv9Str + '</strong> vs <strong>' + gpvStr + '</strong> annualised (+' + a.velocity.toFixed(0) + '%). Business is trending in the right direction.');
+    else if (a.velocity < -15) numbersLines.push('<span style="color:var(--red);">📉 <strong>Volume is dropping.</strong></span> 9-month trailing is <strong>' + gpv9Str + '</strong> vs <strong>' + gpvStr + '</strong> annualised — that\'s <strong>' + a.velocity.toFixed(0) + '% decline</strong>. This needs a conversation: are they facing competition? Foot traffic issues? Seasonal? Or switching providers?');
+    else if (a.velocity < -5) numbersLines.push('<span style="color:var(--red);">📉 Softening.</span> 9-month at <strong>' + gpv9Str + '</strong> vs <strong>' + gpvStr + '</strong> annualised (' + a.velocity.toFixed(0) + '%). Not alarming yet, but worth monitoring.');
+    else numbersLines.push('Volume is <strong>stable</strong> — 9-month trailing at <strong>' + gpv9Str + '</strong> vs <strong>' + gpvStr + '</strong> annualised.');
+  }
+  
+  // YoY
+  if (a.yoy > 10) numbersLines.push('Year-over-year they\'re up <strong>+' + a.yoy.toFixed(1) + '%</strong> — you can reference this: <em>"Your business has grown ' + a.yoy.toFixed(0) + '% year on year — that\'s impressive."</em>');
+  else if (a.yoy < -10) numbersLines.push('YoY is <strong>' + a.yoy.toFixed(1) + '%</strong> — worth acknowledging sensitively: <em>"I noticed things have shifted a bit this year — what\'s been going on?"</em>');
+  
+  sections.push(numbersLines.join(' '));
+  
+  // === BUSINESS MODEL ===
+  if (modelInference) sections.push(modelInference);
+  
+  // === PRODUCT STORY ===
   var prods = a.products.filter(function(p){ return p && p !== 'UNKNOWN' && p !== 'Register POS' && p !== 'Register Terminal'; });
-  if (prods.length >= 4) parts.push('Strong product adoption with ' + prods.length + ' active products including ' + prods.slice(0,3).join(', ') + '.');
-  else if (prods.length >= 1) parts.push('Currently using ' + prods.join(', ') + '.');
-  else parts.push('No SaaS or add-on products adopted yet — entirely on free POS. This is a blank canvas for product conversations.');
+  var prodLines = [];
   
-  // Product gap insight based on category
-  var hasOnline = prods.indexOf('Square Online Store') >= 0 || prods.indexOf('Square Online Checkout') >= 0;
-  var hasLoyalty = prods.indexOf('Loyalty') >= 0;
-  var hasMarketing = prods.indexOf('Marketing') >= 0 || prods.indexOf('Text Message Marketing') >= 0;
-  var hasInvoices = prods.indexOf('Invoices') >= 0;
-  var hasAppts = prods.indexOf('Appointments') >= 0 || prods.indexOf('Appointments Plus') >= 0;
+  if (prods.length >= 5) {
+    prodLines.push('They\'re a <strong>power user</strong> with ' + prods.length + ' Square products active: ' + prods.join(', ') + '. This seller is deeply embedded — focus on making sure everything is working well rather than pushing more products.');
+  } else if (prods.length >= 2) {
+    prodLines.push('Currently using <strong>' + prods.join(', ') + '</strong>. They\'ve shown willingness to adopt beyond basic POS — the next product conversation should feel natural.');
+  } else if (prods.length === 1) {
+    prodLines.push('Only using <strong>' + prods[0] + '</strong> beyond basic POS. There\'s significant room to expand their Square footprint.');
+  } else {
+    prodLines.push('They\'re on <strong>free POS only</strong> — no SaaS or add-on products. This is either a seller who hasn\'t been shown what\'s available, or one who\'s getting what they need from the basics. A discovery conversation would clarify which.');
+  }
   
-  if (a.cat === 'food' && !hasOnline) parts.push('💡 Most food sellers at this tier use Online Store — could help capture delivery/pickup orders.');
-  if (a.cat === 'food' && !hasLoyalty && a.gpv > 0.5) parts.push('💡 Loyalty programs drive repeat visits — strong fit for food businesses above A$500K GPV.');
-  if (a.cat === 'retail' && !hasOnline) parts.push('💡 Retail sellers without an online presence are missing omnichannel revenue — Online Store is a natural fit.');
-  if (a.cat === 'beauty' && !hasAppts) parts.push('💡 Appointments is the #1 product for beauty & wellness — reduces no-shows and streamlines booking.');
-  if (a.cat === 'services' && !hasInvoices) parts.push('💡 Services businesses often benefit from Invoices for quoting and billing.');
-  if (!hasMarketing && a.gpv > 1.0) parts.push('💡 At this GPV level, Marketing tools (email/SMS) can drive measurable repeat business.');
+  // Specific product gaps with REASONING not just "X is a fit"
+  var prodSet = new Set(prods);
+  var hasOnline = prodSet.has('Square Online Store') || prodSet.has('Square Online Checkout');
+  var hasLoyalty = prodSet.has('Loyalty');
+  var hasMarketing = prodSet.has('Marketing') || prodSet.has('Text Message Marketing');
+  var hasAppts = prodSet.has('Appointments') || prodSet.has('Appointments Plus');
+  var hasRST = prodSet.has('Square for Restaurants');
+  var hasRTL = prodSet.has('Square for Retail');
+  var hasKDS = prodSet.has('Square Kitchen Display');
   
-  // Contract & DM context
-  if (a.contract) parts.push('📋 This is a contract account — renewal conversations are key touchpoints.');
-  if (a.days >= 180) parts.push('🔴 No DM in 180+ days — approaching release from your book. Prioritize outreach.');
-  else if (a.days >= 120) parts.push('🟡 Last DM was ' + a.days + ' days ago — schedule a check-in before the 6-month window.');
+  if (a.cat === 'food' && !hasOnline && a.gpv > 0.3) prodLines.push('💡 <strong>No online ordering.</strong> For a ' + catLabel + ' business doing ' + gpvStr + ', even capturing 5-10% of orders online could mean A$' + ((a.gpv * 0.07) * 1000000 / 1000).toFixed(0) + 'K in incremental volume. Ask: <em>"Do customers ever ask if they can order ahead or get delivery?"</em>');
+  if (a.cat === 'food' && hasRST && !hasKDS && a.locations > 1) prodLines.push('💡 <strong>Using Restaurants POS but no Kitchen Display.</strong> With ' + a.locations + ' locations, kitchen communication is probably a bottleneck. KDS eliminates paper tickets and reduces order errors.');
+  if (a.cat === 'food' && !hasLoyalty && a.gpv > 0.5 && a.avgTicket < 25) prodLines.push('💡 <strong>No loyalty program.</strong> At ' + ticketStr + ' avg ticket with high frequency, a loyalty program could increase visit frequency by 15-20%. Ask: <em>"Do you see a lot of regulars? How do you reward them today?"</em>');
+  if (a.cat === 'retail' && !hasOnline) prodLines.push('💡 <strong>No online presence.</strong> Retail without eCommerce is leaving money on the table. Ask: <em>"Do customers ever ask if they can buy from you online?"</em>');
+  if (a.cat === 'beauty' && !hasAppts) prodLines.push('💡 <strong>No Appointments.</strong> For beauty & wellness, this is the #1 product — reduces no-shows (which cost the avg salon A$5-10K/year) and lets clients book 24/7.');
+  if (!hasMarketing && a.gpv > 1.0 && (hasLoyalty || prods.length >= 3)) prodLines.push('💡 <strong>No Marketing tools.</strong> They\'re already engaged with Square products — email/SMS campaigns could drive A$' + ((a.gpv * 0.03) * 1000000 / 1000).toFixed(0) + 'K+ in repeat revenue based on industry benchmarks.');
   
-  // Avg ticket insight
-  if (a.avgTicket > 100 && a.cat === 'food') parts.push('High avg ticket (A$' + a.avgTicket.toFixed(0) + ') for food suggests catering, events, or premium dining.');
-  if (a.avgTicket < 10 && a.avgTicket > 0) parts.push('Very low avg ticket (A$' + a.avgTicket.toFixed(2) + ') — high-volume micro-transactions, hardware reliability matters.');
+  if (prodLines.length) sections.push(prodLines.join(' '));
   
-  return parts.join(' ');
+  // === RELATIONSHIP CONTEXT ===
+  var relLines = [];
+  if (a.contract) relLines.push('📋 <strong>Contract account.</strong> This is a committed seller — they\'ve chosen to partner with Square formally. Treat renewal conversations as strategic check-ins, not sales pitches.');
+  if (a.tenure >= 60) relLines.push('🏆 <strong>' + (a.tenure/12).toFixed(0) + '-year relationship.</strong> This is a long-term partner. They\'ve seen Square evolve — ask what\'s changed for their business and what they need next.');
+  else if (a.tenure >= 36) relLines.push('This is a <strong>mature relationship</strong> (' + (a.tenure/12).toFixed(0) + ' years). They trust Square — lean into advisory mode.');
+  
+  if (a.days >= 150 && a.days < 999) relLines.push('⚠️ <strong>Last DM was ' + a.days + ' days ago.</strong> You\'re approaching the 6-month ownership window. A call now isn\'t just good practice — it protects your book.');
+  else if (a.days >= 999) relLines.push('⚠️ <strong>Activity data shows 999 days</strong> — this is likely a data issue (merchant token mismatch). Check SFDC for actual contact history before reaching out.');
+  
+  if (relLines.length) sections.push(relLines.join(' '));
+  
+  return sections.join('</p><p style="margin-top:8px;">');
 }
 
 // Milestone detection
@@ -1279,7 +1333,7 @@ function toggleDetail(idx) {
       // Know Your Seller
       '<div style="background:var(--bg3);border-radius:8px;padding:14px;margin-bottom:12px;border-left:3px solid var(--blue);">' +
         '<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;"><i class="fas fa-lightbulb" style="color:var(--yellow);margin-right:4px;"></i>Know Your Seller</div>' +
-        '<div style="font-size:12px;color:var(--text);line-height:1.7;">' + sellerNarrative(a) + '</div>' +
+        '<div style="font-size:12px;color:var(--text);line-height:1.7;"><p>' + sellerNarrative(a) + '</p></div>' +
       '</div>' +
       
       // Next Best Actions
