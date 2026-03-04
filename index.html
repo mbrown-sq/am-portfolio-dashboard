@@ -548,7 +548,8 @@ const accounts = DATA.accounts.map(a => ({
   days: a.d, health: a.h, risk: a.r === 'at_risk' ? 'at-risk' : a.r,
   am: a.am, sf: a.sf, ar: a.ar, at: a.at, locations: a.l,
   tenure: a.tn, contract: a.ct, activities30d: a.a30, csatStars: a.cs, ci: a.ci,
-  lastProcessed: a.lp
+  lastProcessed: a.lp,
+  products: a.products ? a.products.split(',') : []
 }));
 
 // Map alerts from DATA.alerts
@@ -1040,19 +1041,33 @@ function toggleDetail(idx) {
         peerBenchmarkHtml(a) +
       '</div>' +
     '</div>' +
-    '<div style="background:var(--bg2);border-radius:6px;padding:10px;margin-top:8px;">' +
-      '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">Product Adoption <span style="color:var(--text3);text-transform:none;letter-spacing:0;">(placeholder — Snowflake integration pending)</span></div>' +
-      '<div class="product-grid">' +
-        '<span class="product-pill active"><i class="fas fa-cash-register"></i>POS</span>' +
-        '<span class="product-pill '+(a.contract?'active':'inactive')+'"><i class="fas fa-file-contract"></i>Contract</span>' +
-        '<span class="product-pill inactive"><i class="fas fa-globe"></i>Online</span>' +
-        '<span class="product-pill inactive"><i class="fas fa-file-invoice-dollar"></i>Invoices</span>' +
-        '<span class="product-pill inactive"><i class="fas fa-calendar-check"></i>Appointments</span>' +
-        '<span class="product-pill inactive"><i class="fas fa-heart"></i>Loyalty</span>' +
-        '<span class="product-pill inactive"><i class="fas fa-bullhorn"></i>Marketing</span>' +
-        '<span class="product-pill inactive"><i class="fas fa-money-check-alt"></i>Payroll</span>' +
-      '</div>' +
-    '</div>' +
+    (function(){
+      var allProducts = [
+        {key:'Square Online Store', icon:'fa-globe', label:'Online'},
+        {key:'Square for Restaurants', icon:'fa-utensils', label:'Restaurants'},
+        {key:'Square for Retail', icon:'fa-shopping-bag', label:'Retail POS'},
+        {key:'Appointments', icon:'fa-calendar-check', label:'Appointments'},
+        {key:'Invoices', icon:'fa-file-invoice-dollar', label:'Invoices'},
+        {key:'Loyalty', icon:'fa-heart', label:'Loyalty'},
+        {key:'Marketing', icon:'fa-bullhorn', label:'Marketing'},
+        {key:'Team Management', icon:'fa-users', label:'Team Mgmt'},
+        {key:'Shifts', icon:'fa-clock', label:'Shifts'},
+        {key:'Square Kitchen Display', icon:'fa-tv', label:'KDS'},
+        {key:'Square Kiosk', icon:'fa-tablet-alt', label:'Kiosk'}
+      ];
+      var pills = '<span class="product-pill active"><i class="fas fa-cash-register"></i>POS</span>';
+      if(a.contract) pills += '<span class="product-pill active"><i class="fas fa-file-contract"></i>Contract</span>';
+      allProducts.forEach(function(p){
+        var has = a.products.indexOf(p.key) >= 0;
+        pills += '<span class="product-pill '+(has?'active':'inactive')+'"><i class="fas '+p.icon+'"></i>'+p.label+'</span>';
+      });
+      var adoptionCount = a.products.length;
+      var adoptionLabel = adoptionCount > 0 ? adoptionCount + ' active SaaS product' + (adoptionCount>1?'s':'') : 'No SaaS products — upsell opportunity';
+      return '<div style="background:var(--bg2);border-radius:6px;padding:10px;margin-top:8px;">' +
+        '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">Product Adoption <span style="text-transform:none;letter-spacing:0;color:'+(adoptionCount>0?'var(--green)':'var(--yellow)')+';">— '+adoptionLabel+'</span></div>' +
+        '<div class="product-grid">' + pills + '</div>' +
+      '</div>';
+    })() +
     '<div class="detail-actions">' +
       '<a class="detail-btn" href="'+sfUrl+'" target="_blank"><i class="fas fa-external-link-alt"></i>View in Salesforce</a>' +
       '<a class="detail-btn secondary" href="#"><i class="fas fa-plus-circle"></i>Log Activity</a>' +
