@@ -256,6 +256,7 @@ svg text { font-family:'Inter',sans-serif; }
 
 /* TRANSITIONS */
 .fade-in { animation: fadeIn .3s ease; }
+@keyframes fadeOut { from { opacity:1; } to { opacity:0; } }
 @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
 
 @media (max-width:1200px) {
@@ -267,6 +268,30 @@ svg text { font-family:'Inter',sans-serif; }
 
 /* SPARKLINE */
 .sparkline-svg { vertical-align:middle; }
+
+
+/* SELLER MODAL */
+.seller-modal-overlay {
+  position:fixed; top:0; left:0; right:0; bottom:0;
+  background:rgba(0,0,0,0.7); z-index:200;
+  display:flex; align-items:center; justify-content:center;
+  animation:fadeIn .2s ease;
+}
+.seller-modal {
+  background:var(--bg2); border:1px solid var(--border); border-radius:12px;
+  width:90%; max-width:900px; max-height:90vh; overflow-y:auto;
+  padding:24px; position:relative;
+  animation:slideUp .25s ease;
+  box-shadow:0 20px 60px rgba(0,0,0,0.5);
+}
+@keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+.seller-modal-close {
+  position:sticky; top:0; float:right; z-index:10;
+  background:var(--bg3); border:1px solid var(--border); color:var(--text2);
+  width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:14px;
+  display:flex; align-items:center; justify-content:center; transition:all .15s;
+}
+.seller-modal-close:hover { border-color:var(--red); color:var(--red); background:var(--red-dim); }
 
 /* EXPANDABLE DETAIL */
 .detail-row td { padding:0 !important; border:none !important; }
@@ -1213,111 +1238,157 @@ renderTable = function() {
 };
 
 function toggleDetail(idx) {
-  const list = getFilteredAccounts();
-  const a = list[idx];
-  const tbody = document.getElementById('tableBody');
-  const existingDetail = document.getElementById('detail-row');
+  // Close any existing modal
+  var existing = document.getElementById('seller-modal-overlay');
+  if (existing) { existing.remove(); }
   
-  if (existingDetail) {
-    const wasIdx = existingDetail.dataset.idx;
-    existingDetail.remove();
-    if (parseInt(wasIdx) === idx) { expandedRow = null; return; }
-  }
+  var list = getFilteredAccounts();
+  var a = list[idx];
+  if (!a) return;
   
-  expandedRow = idx;
-  const row = document.getElementById('row-' + idx);
-  if (!row) return;
+  var sfUrl = a.sf ? 'https://squareinc.lightning.force.com/lightning/r/Account/' + a.sf + '/view' : '#';
+  var starsVal = a.csatStars || 0;
+  var starsHtml = starsVal > 0 ? ('★'.repeat(Math.round(starsVal)) + '☆'.repeat(5 - Math.round(starsVal)) + ' (' + starsVal.toFixed(1) + ')') : '<span style="color:var(--text3)">No CSAT</span>';
+  var sparkLarge = makeLargeSparkline(a.spark, a.yoy >= 0);
+  var daysWarning = a.days >= 999 ? ' <span style="color:var(--orange);font-size:9px;" title="999 days may indicate merchant token mismatch">⚠ verify</span>' : '';
   
-  const sfUrl = a.sf ? 'https://squareinc.lightning.force.com/lightning/r/Account/' + a.sf + '/view' : '#';
-  const starsVal = a.csatStars || 0;
-  const starsHtml = starsVal > 0 ? ('★'.repeat(Math.round(starsVal)) + '☆'.repeat(5 - Math.round(starsVal)) + ' (' + starsVal.toFixed(1) + ')') : '<span style="color:var(--text3)">No CSAT</span>';
-  const sparkLarge = makeLargeSparkline(a.spark, a.yoy >= 0);
-  const daysWarning = a.days >= 999 ? ' <span style="color:var(--orange);font-size:9px;" title="999 days may indicate merchant token mismatch — verify in SFDC">⚠ verify</span>' : '';
-  
-  const detailHtml = '<tr class="detail-row" id="detail-row" data-idx="'+idx+'"><td colspan="12"><div class="detail-card">' +
-    '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
-      '<div><div style="font-size:14px;font-weight:700;">'+a.name+'</div>' +
-      '<div style="font-size:10px;color:var(--text3);margin-top:2px;">'+a.cat.replace(/_/g,' ')+' &bull; '+(a.contract?'<span class=\'badge-contract\'>CONTRACT</span>':'<span class=\'badge-standard\'>STANDARD</span>')+' &bull; '+a.tenure+' months with Square</div></div>' +
-      '<div>'+sparkLarge+'</div>' +
-    '</div>' +
-    '<div class="detail-grid">' +
-      '<div class="detail-metric"><div class="detail-metric-label">Annualized GPV</div><div class="detail-metric-value" style="color:var(--blue-light);">A$'+(a.gpv*1000000).toLocaleString('en-AU',{maximumFractionDigits:0})+'</div></div>' +
-      '<div class="detail-metric"><div class="detail-metric-label">Annualized AR</div><div class="detail-metric-value">A$'+(a.ar).toLocaleString('en-AU',{maximumFractionDigits:0})+'</div></div>' +
-      '<div class="detail-metric"><div class="detail-metric-label">Avg Ticket</div><div class="detail-metric-value">A$'+(a.avgTicket||0).toFixed(2)+'</div></div>' +
-      '<div class="detail-metric"><div class="detail-metric-label">Active Locations</div><div class="detail-metric-value">'+a.locations+'</div></div>' +
-    '</div>' +
-    '<div class="detail-info">' +
-      '<div class="detail-tag"><i class="fas fa-clock"></i>Last contact '+a.days+' days ago'+daysWarning+'</div>' +
-      '<div class="detail-tag"><i class="fas fa-phone"></i>'+a.activities30d+' activities (30d)</div>' +
-      '<div class="detail-tag"><i class="fas fa-star"></i><span class="stars">'+starsHtml+'</span></div>' +
-      '<div class="detail-tag"><i class="fas fa-chart-line"></i>YoY '+(a.yoy>=0?'+':'')+a.yoy+'%</div>' +
-      (a.city ? '<div class="detail-tag"><i class="fas fa-map-marker-alt"></i>'+a.city+(a.state?', '+a.state:'')+(a.postcode?' '+a.postcode:'')+'</div>' : '') +
-      (a.sellerClass ? '<div class="detail-tag"><i class="fas fa-layer-group"></i>'+a.sellerClass+'</div>' : '') +
-    '</div>' +
-    (function(){
-      var ms = sellerMilestones(a);
-      return ms.length ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;">' + ms.map(function(m){return '<span style="font-size:10px;background:var(--blue-dim);color:var(--blue-light);padding:3px 10px;border-radius:12px;font-weight:600;">'+m.icon+' '+m.text+'</span>';}).join('') + '</div>' : '';
-    })() +
-    '<div style="background:var(--bg2);border-radius:6px;padding:12px;margin:8px 0;border-left:3px solid var(--blue);">' +
-      '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;"><i class="fas fa-lightbulb" style="color:var(--yellow);margin-right:4px;"></i>Know Your Seller</div>' +
-      '<div style="font-size:11px;color:var(--text);line-height:1.6;">' + sellerNarrative(a) + '</div>' +
-    '</div>' +
-    nextBestActionsHtml(a) +
-    '<div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap;">' +
-      '<div style="flex:1;min-width:200px;background:var(--bg2);border-radius:6px;padding:10px;">' +
-        '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">GPV Velocity (9mo vs Annual)</div>' +
-        '<div style="display:flex;align-items:center;gap:8px;">' +
-          velocityBadge(a.velocity) +
-          '<span style="font-size:10px;color:var(--text2);">9mo: A$'+(a.gpv9||0).toFixed(2)+'M vs Ann: A$'+a.gpv.toFixed(2)+'M</span>' +
+  var modalHtml = '<div class="seller-modal-overlay" id="seller-modal-overlay" onclick="if(event.target===this)closeModal()">' +
+    '<div class="seller-modal">' +
+      '<button class="seller-modal-close" onclick="closeModal()" title="Close"><i class="fas fa-times"></i></button>' +
+      
+      // Header
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">' +
+        '<div>' +
+          '<div style="font-size:20px;font-weight:800;color:var(--text);">' + a.name + '</div>' +
+          '<div style="font-size:11px;color:var(--text3);margin-top:4px;">' +
+            '<span style="text-transform:capitalize;">' + a.cat + '</span> &bull; ' +
+            (a.contract ? '<span class="badge-contract">CONTRACT</span>' : '<span class="badge-standard">STANDARD</span>') +
+            ' &bull; ' + a.tenure + ' months with Square' +
+            (a.city ? ' &bull; <i class="fas fa-map-marker-alt" style="color:var(--blue);margin:0 2px;"></i>' + a.city + (a.state ? ', ' + a.state : '') + (a.postcode ? ' ' + a.postcode : '') : '') +
+          '</div>' +
         '</div>' +
-        '<div style="font-size:9px;color:var(--text3);margin-top:4px;">' +
-          (a.velocity > 10 ? 'Accelerating — seller is growing faster recently' :
-           a.velocity < -10 ? 'Decelerating — recent volume dropping, investigate' :
-           a.velocity < -50 ? 'Severe decline — possible provider switch or closure' :
-           'Stable trajectory') +
+        '<div style="text-align:right;">' + sparkLarge + '</div>' +
+      '</div>' +
+      
+      // Milestones
+      (function(){
+        var ms = sellerMilestones(a);
+        return ms.length ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">' + ms.map(function(m){return '<span style="font-size:10px;background:var(--blue-dim);color:var(--blue-light);padding:3px 10px;border-radius:12px;font-weight:600;">'+m.icon+' '+m.text+'</span>';}).join('') + '</div>' : '';
+      })() +
+      
+      // Know Your Seller
+      '<div style="background:var(--bg3);border-radius:8px;padding:14px;margin-bottom:12px;border-left:3px solid var(--blue);">' +
+        '<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;"><i class="fas fa-lightbulb" style="color:var(--yellow);margin-right:4px;"></i>Know Your Seller</div>' +
+        '<div style="font-size:12px;color:var(--text);line-height:1.7;">' + sellerNarrative(a) + '</div>' +
+      '</div>' +
+      
+      // Next Best Actions
+      nextBestActionsHtml(a) +
+      
+      // Metrics grid
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0;">' +
+        '<div style="background:var(--bg3);border-radius:6px;padding:12px;">' +
+          '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;">Annualized GPV</div>' +
+          '<div style="font-size:18px;font-weight:700;color:var(--blue-light);margin-top:4px;">A$' + (a.gpv*1000000).toLocaleString('en-AU',{maximumFractionDigits:0}) + '</div>' +
+        '</div>' +
+        '<div style="background:var(--bg3);border-radius:6px;padding:12px;">' +
+          '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;">Annualized AR</div>' +
+          '<div style="font-size:18px;font-weight:700;margin-top:4px;">A$' + (a.ar).toLocaleString('en-AU',{maximumFractionDigits:0}) + '</div>' +
+        '</div>' +
+        '<div style="background:var(--bg3);border-radius:6px;padding:12px;">' +
+          '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;">Avg Ticket</div>' +
+          '<div style="font-size:18px;font-weight:700;margin-top:4px;">A$' + (a.avgTicket||0).toFixed(2) + '</div>' +
+        '</div>' +
+        '<div style="background:var(--bg3);border-radius:6px;padding:12px;">' +
+          '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;">Active Locations</div>' +
+          '<div style="font-size:18px;font-weight:700;margin-top:4px;">' + a.locations + '</div>' +
         '</div>' +
       '</div>' +
-      '<div style="flex:1;min-width:200px;background:var(--bg2);border-radius:6px;padding:10px;">' +
-        '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">Peer Benchmark ('+a.cat+')</div>' +
-        peerBenchmarkHtml(a) +
+      
+      // Info tags
+      '<div style="display:flex;gap:14px;flex-wrap:wrap;margin:10px 0;">' +
+        '<div class="detail-tag"><i class="fas fa-clock"></i>Last contact ' + a.days + ' days ago' + daysWarning + '</div>' +
+        '<div class="detail-tag"><i class="fas fa-phone"></i>' + a.activities30d + ' activities (30d)</div>' +
+        '<div class="detail-tag"><i class="fas fa-star"></i><span class="stars">' + starsHtml + '</span></div>' +
+        '<div class="detail-tag"><i class="fas fa-chart-line"></i>YoY ' + (a.yoy>=0?'+':'') + a.yoy + '%</div>' +
+        (a.sellerClass ? '<div class="detail-tag"><i class="fas fa-layer-group"></i>' + a.sellerClass + '</div>' : '') +
       '</div>' +
+      
+      // Velocity + Peer side by side
+      '<div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap;">' +
+        '<div style="flex:1;min-width:200px;background:var(--bg3);border-radius:6px;padding:12px;">' +
+          '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">GPV Velocity (9mo vs Annual)</div>' +
+          '<div style="display:flex;align-items:center;gap:8px;">' +
+            velocityBadge(a.velocity) +
+            '<span style="font-size:10px;color:var(--text2);">9mo: A$' + (a.gpv9||0).toFixed(2) + 'M vs Ann: A$' + a.gpv.toFixed(2) + 'M</span>' +
+          '</div>' +
+          '<div style="font-size:9px;color:var(--text3);margin-top:4px;">' +
+            (a.velocity > 10 ? 'Accelerating — seller is growing faster recently' :
+             a.velocity < -10 ? 'Decelerating — recent volume dropping, investigate' :
+             a.velocity < -50 ? 'Severe decline — possible provider switch or closure' :
+             'Stable trajectory') +
+          '</div>' +
+        '</div>' +
+        '<div style="flex:1;min-width:200px;background:var(--bg3);border-radius:6px;padding:12px;">' +
+          '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">Peer Benchmark (' + a.cat + ')</div>' +
+          peerBenchmarkHtml(a) +
+        '</div>' +
+      '</div>' +
+      
+      // Product Adoption
+      (function(){
+        var allProducts = [
+          {key:"Square Online Store",icon:"fa-globe",label:"Online"},{key:"Square for Restaurants",icon:"fa-utensils",label:"Restaurants"},
+          {key:"Square for Retail",icon:"fa-shopping-bag",label:"Retail POS"},{key:"Appointments",icon:"fa-calendar-check",label:"Appointments"},
+          {key:"Invoices",icon:"fa-file-invoice-dollar",label:"Invoices"},{key:"Loyalty",icon:"fa-heart",label:"Loyalty"},
+          {key:"Marketing",icon:"fa-bullhorn",label:"Marketing"},{key:"Team Management",icon:"fa-users",label:"Team Mgmt"},
+          {key:"Shifts",icon:"fa-clock",label:"Shifts"},{key:"Square Kitchen Display",icon:"fa-tv",label:"KDS"},
+          {key:"Afterpay",icon:"fa-credit-card",label:"Afterpay"},{key:"Gift Cards",icon:"fa-gift",label:"Gift Cards"},
+          {key:"Instant Deposit",icon:"fa-bolt",label:"Instant Dep"}
+        ];
+        var pills = '<span class="product-pill active"><i class="fas fa-cash-register"></i>POS</span>';
+        if(a.contract) pills += '<span class="product-pill active"><i class="fas fa-file-contract"></i>Contract</span>';
+        allProducts.forEach(function(p){
+          var has = a.products.indexOf(p.key) >= 0;
+          pills += '<span class="product-pill '+(has?'active':'inactive')+'"><i class="fas '+p.icon+'"></i>'+p.label+'</span>';
+        });
+        var adoptionCount = a.products.filter(function(p){return p && p!=='UNKNOWN' && p!=='Register POS' && p!=='Register Terminal';}).length;
+        var adoptionLabel = adoptionCount > 0 ? adoptionCount + ' active product' + (adoptionCount>1?'s':'') : 'No add-on products — upsell opportunity';
+        return '<div style="background:var(--bg3);border-radius:6px;padding:12px;margin-top:12px;">' +
+          '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">Product Adoption <span style="text-transform:none;letter-spacing:0;color:'+(adoptionCount>0?'var(--green)':'var(--yellow)')+';">— '+adoptionLabel+'</span></div>' +
+          '<div class="product-grid">' + pills + '</div>' +
+        '</div>';
+      })() +
+      
+      // Similar Sellers
+      similarSellersHtml(a) +
+      
+      // Action buttons
+      '<div style="display:flex;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid var(--border);">' +
+        '<a class="detail-btn" href="' + sfUrl + '" target="_blank"><i class="fas fa-external-link-alt"></i>View in Salesforce</a>' +
+        '<a class="detail-btn secondary" href="#"><i class="fas fa-plus-circle"></i>Log Activity</a>' +
+        '<button class="detail-btn secondary" onclick="closeModal()" style="margin-left:auto;"><i class="fas fa-times"></i>Close</button>' +
+      '</div>' +
+      
     '</div>' +
-    (function(){
-      var allProducts = [
-        {key:'Square Online Store', icon:'fa-globe', label:'Online'},
-        {key:'Square for Restaurants', icon:'fa-utensils', label:'Restaurants'},
-        {key:'Square for Retail', icon:'fa-shopping-bag', label:'Retail POS'},
-        {key:'Appointments', icon:'fa-calendar-check', label:'Appointments'},
-        {key:'Invoices', icon:'fa-file-invoice-dollar', label:'Invoices'},
-        {key:'Loyalty', icon:'fa-heart', label:'Loyalty'},
-        {key:'Marketing', icon:'fa-bullhorn', label:'Marketing'},
-        {key:'Team Management', icon:'fa-users', label:'Team Mgmt'},
-        {key:'Shifts', icon:'fa-clock', label:'Shifts'},
-        {key:'Square Kitchen Display', icon:'fa-tv', label:'KDS'},
-        {key:'Square Kiosk', icon:'fa-tablet-alt', label:'Kiosk'}
-      ];
-      var pills = '<span class="product-pill active"><i class="fas fa-cash-register"></i>POS</span>';
-      if(a.contract) pills += '<span class="product-pill active"><i class="fas fa-file-contract"></i>Contract</span>';
-      allProducts.forEach(function(p){
-        var has = a.products.indexOf(p.key) >= 0;
-        pills += '<span class="product-pill '+(has?'active':'inactive')+'"><i class="fas '+p.icon+'"></i>'+p.label+'</span>';
-      });
-      var adoptionCount = a.products.length;
-      var adoptionLabel = adoptionCount > 0 ? adoptionCount + ' active SaaS product' + (adoptionCount>1?'s':'') : 'No SaaS products — upsell opportunity';
-      return '<div style="background:var(--bg2);border-radius:6px;padding:10px;margin-top:8px;">' +
-        '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">Product Adoption <span style="text-transform:none;letter-spacing:0;color:'+(adoptionCount>0?'var(--green)':'var(--yellow)')+';">— '+adoptionLabel+'</span></div>' +
-        '<div class="product-grid">' + pills + '</div>' +
-      '</div>';
-    })() +
-    similarSellersHtml(a) +
-    '<div class="detail-actions">' +
-      '<a class="detail-btn" href="'+sfUrl+'" target="_blank"><i class="fas fa-external-link-alt"></i>View in Salesforce</a>' +
-      '<a class="detail-btn secondary" href="#"><i class="fas fa-plus-circle"></i>Log Activity</a>' +
-    '</div>' +
-  '</div></td></tr>';
+  '</div>';
   
-  row.insertAdjacentHTML('afterend', detailHtml);
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+  document.body.style.overflow = 'hidden';
 }
+
+function closeModal() {
+  var overlay = document.getElementById('seller-modal-overlay');
+  if (overlay) {
+    overlay.style.animation = 'fadeOut .15s ease forwards';
+    setTimeout(function(){ overlay.remove(); document.body.style.overflow = ''; }, 150);
+  }
+}
+
+// Close on Escape key
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeModal();
+});
 
 function exportCSV() {
   const list = getFilteredAccounts();
