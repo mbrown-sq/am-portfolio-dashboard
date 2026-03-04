@@ -894,6 +894,112 @@ function velocityBadge(vel) {
 }
 
 
+
+function nextBestActions(a) {
+  var actions = [];
+  
+  // === URGENT (red) — ownership & risk ===
+  if (a.days >= 180) actions.push({pri:1, type:'urgent', icon:'🔴', text:'No DM in ' + a.days + ' days — at risk of release from your book. Call this week.', category:'Retain Ownership'});
+  else if (a.days >= 150) actions.push({pri:2, type:'urgent', icon:'🟠', text:'Last DM was ' + a.days + ' days ago — 6-month window closing. Schedule outreach.', category:'Retain Ownership'});
+  
+  if (a.velocity < -20) actions.push({pri:1, type:'urgent', icon:'🔴', text:'GPV declining ' + a.velocity.toFixed(0) + '% — investigate if seller is switching providers or facing business issues.', category:'Retention'});
+  else if (a.velocity < -10) actions.push({pri:3, type:'urgent', icon:'🟠', text:'Volume softening (' + a.velocity.toFixed(0) + '%) — worth a check-in to understand what\'s changed.', category:'Retention'});
+  
+  if (a.contract && a.days >= 90) actions.push({pri:2, type:'urgent', icon:'🔴', text:'Contract account with no recent DM — prioritize renewal conversation.', category:'Retention'});
+  
+  if (a.locations === 0) actions.push({pri:3, type:'urgent', icon:'🟠', text:'No active locations on file — verify if business is still operating.', category:'Data Quality'});
+  
+  // === GROW (blue) — product opportunities ===
+  var prods = a.products.filter(function(p){ return p && p !== 'UNKNOWN' && p !== 'Register POS' && p !== 'Register Terminal'; });
+  var prodSet = new Set(prods);
+  
+  // Category-specific product recommendations
+  if (a.cat === 'food' && !prodSet.has('Square Online Store') && !prodSet.has('Square Online Checkout') && a.gpv > 0.3)
+    actions.push({pri:4, type:'grow', icon:'📈', text:'Online Store — capture delivery/pickup orders. High adoption among food sellers at this GPV.', category:'Product: Online'});
+  
+  if (a.cat === 'food' && !prodSet.has('Loyalty') && a.gpv > 0.5)
+    actions.push({pri:5, type:'grow', icon:'📈', text:'Loyalty — drives repeat visits. Strong fit for food businesses above A$500K.', category:'Product: Loyalty'});
+  
+  if (a.cat === 'food' && !prodSet.has('Square Kitchen Display') && prodSet.has('Square for Restaurants') && a.locations > 1)
+    actions.push({pri:6, type:'grow', icon:'📈', text:'Kitchen Display System — natural add-on for multi-location restaurants already on RST POS.', category:'Product: KDS'});
+  
+  if (a.cat === 'retail' && !prodSet.has('Square Online Store') && !prodSet.has('Square Online Checkout'))
+    actions.push({pri:4, type:'grow', icon:'📈', text:'Online Store — retail sellers without eCommerce are missing omnichannel revenue.', category:'Product: Online'});
+  
+  if (a.cat === 'retail' && !prodSet.has('Square for Retail') && a.gpv > 0.5)
+    actions.push({pri:5, type:'grow', icon:'📈', text:'Retail POS — purpose-built for inventory management, purchase orders, vendor management.', category:'Product: Retail POS'});
+  
+  if (a.cat === 'beauty' && !prodSet.has('Appointments') && !prodSet.has('Appointments Plus'))
+    actions.push({pri:4, type:'grow', icon:'📈', text:'Appointments — #1 product for beauty & wellness. Reduces no-shows, streamlines booking.', category:'Product: Appointments'});
+  
+  if (a.cat === 'services' && !prodSet.has('Invoices'))
+    actions.push({pri:5, type:'grow', icon:'📈', text:'Invoices — services businesses benefit from quoting and billing tools.', category:'Product: Invoices'});
+  
+  if (!prodSet.has('Marketing') && !prodSet.has('Text Message Marketing') && a.gpv > 1.0)
+    actions.push({pri:6, type:'grow', icon:'📈', text:'Marketing (email/SMS) — at A$' + a.gpv.toFixed(1) + 'M GPV, marketing tools drive measurable repeat business.', category:'Product: Marketing'});
+  
+  if (!prodSet.has('Afterpay') && a.cat === 'retail')
+    actions.push({pri:6, type:'grow', icon:'📈', text:'Afterpay — retail sellers see higher avg ticket with BNPL. Check if already enabled.', category:'Product: Afterpay'});
+  
+  if (prods.length === 0)
+    actions.push({pri:4, type:'grow', icon:'📈', text:'No add-on products yet — blank canvas. Start with the highest-fit product for ' + a.cat + '.', category:'Product: Any'});
+  
+  // Peer-driven recommendations
+  var similar = findSimilarSellers(a, accounts);
+  if (similar.length >= 2) {
+    var myProdSet = new Set(prods);
+    var peerProds = {};
+    similar.forEach(function(s) {
+      s.products.filter(function(p){return p && p!=='UNKNOWN' && p!=='Register POS' && p!=='Register Terminal';}).forEach(function(p) {
+        if (!myProdSet.has(p)) peerProds[p] = (peerProds[p]||0) + 1;
+      });
+    });
+    var topGap = Object.entries(peerProds).sort(function(a,b){return b[1]-a[1];})[0];
+    if (topGap && topGap[1] >= 2) {
+      actions.push({pri:5, type:'grow', icon:'👥', text:topGap[0] + ' — used by ' + topGap[1] + '/' + similar.length + ' similar ' + a.cat + ' sellers. Peer proof point for the conversation.', category:'Peer Insight'});
+    }
+  }
+  
+  // Velocity-based growth
+  if (a.velocity > 15) actions.push({pri:6, type:'grow', icon:'⚡', text:'Seller is accelerating (+' + a.velocity.toFixed(0) + '%) — great time to discuss growth tools while momentum is high.', category:'Timing'});
+  
+  // === CELEBRATE (green) — relationship building ===
+  var ms = sellerMilestones(a);
+  ms.forEach(function(m) {
+    actions.push({pri:7, type:'celebrate', icon:m.icon, text:m.text + ' — great reason to reach out and strengthen the relationship.', category:'Milestone'});
+  });
+  
+  if (a.velocity > 25) actions.push({pri:7, type:'celebrate', icon:'🎉', text:'Fastest growth period — acknowledge their success. "I noticed your volume is up ' + a.velocity.toFixed(0) + '%..."', category:'Recognition'});
+  
+  if (prods.length >= 5) actions.push({pri:8, type:'celebrate', icon:'🌟', text:'Power user with ' + prods.length + ' products — consider for case study, referral program, or beta testing.', category:'Advocacy'});
+  
+  // Sort by priority and cap at 5
+  actions.sort(function(a,b){ return a.pri - b.pri; });
+  return actions.slice(0, 5);
+}
+
+function nextBestActionsHtml(a) {
+  var actions = nextBestActions(a);
+  if (actions.length === 0) return '';
+  
+  var typeColors = {urgent:'var(--red)',grow:'var(--blue-light)',celebrate:'var(--green)'};
+  var typeBgs = {urgent:'var(--red-dim)',grow:'var(--blue-dim)',celebrate:'var(--green-dim)'};
+  var typeLabels = {urgent:'URGENT',grow:'GROW',celebrate:'CELEBRATE'};
+  
+  var rows = actions.map(function(act) {
+    return '<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid rgba(30,51,71,0.3);">' +
+      '<span style="font-size:9px;padding:2px 6px;border-radius:8px;font-weight:700;white-space:nowrap;background:' + typeBgs[act.type] + ';color:' + typeColors[act.type] + ';">' + typeLabels[act.type] + '</span>' +
+      '<span style="font-size:10px;color:var(--text);line-height:1.4;">' + act.icon + ' ' + act.text + '</span>' +
+      '<span style="font-size:8px;color:var(--text3);white-space:nowrap;margin-left:auto;">' + act.category + '</span>' +
+    '</div>';
+  }).join('');
+  
+  return '<div style="background:var(--bg2);border-radius:6px;padding:12px;margin:8px 0;border-left:3px solid var(--green);">' +
+    '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;"><i class="fas fa-bolt" style="color:var(--yellow);margin-right:4px;"></i>Next Best Actions</div>' +
+    rows +
+  '</div>';
+}
+
 function sellerNarrative(a) {
   var parts = [];
   
@@ -1156,6 +1262,7 @@ function toggleDetail(idx) {
       '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;"><i class="fas fa-lightbulb" style="color:var(--yellow);margin-right:4px;"></i>Know Your Seller</div>' +
       '<div style="font-size:11px;color:var(--text);line-height:1.6;">' + sellerNarrative(a) + '</div>' +
     '</div>' +
+    nextBestActionsHtml(a) +
     '<div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap;">' +
       '<div style="flex:1;min-width:200px;background:var(--bg2);border-radius:6px;padding:10px;">' +
         '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">GPV Velocity (9mo vs Annual)</div>' +
