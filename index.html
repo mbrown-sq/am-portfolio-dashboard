@@ -892,8 +892,10 @@ function toggleDetail(idx) {
   if (!row) return;
   
   const sfUrl = a.sf ? 'https://squareinc.lightning.force.com/lightning/r/Account/' + a.sf + '/view' : '#';
-  const stars = '★'.repeat(a.csatStars) + '☆'.repeat(5 - a.csatStars);
+  const starsVal = a.csatStars || 0;
+  const starsHtml = starsVal > 0 ? ('★'.repeat(Math.round(starsVal)) + '☆'.repeat(5 - Math.round(starsVal)) + ' (' + starsVal.toFixed(1) + ')') : '<span style="color:var(--text3)">No CSAT</span>';
   const sparkLarge = makeLargeSparkline(a.spark, a.yoy >= 0);
+  const daysWarning = a.days >= 999 ? ' <span style="color:var(--orange);font-size:9px;" title="999 days may indicate merchant token mismatch — verify in SFDC">⚠ verify</span>' : '';
   
   const detailHtml = '<tr class="detail-row" id="detail-row" data-idx="'+idx+'"><td colspan="11"><div class="detail-card">' +
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
@@ -908,9 +910,9 @@ function toggleDetail(idx) {
       '<div class="detail-metric"><div class="detail-metric-label">Active Locations</div><div class="detail-metric-value">'+a.locations+'</div></div>' +
     '</div>' +
     '<div class="detail-info">' +
-      '<div class="detail-tag"><i class="fas fa-clock"></i>Last contact '+a.days+' days ago</div>' +
+      '<div class="detail-tag"><i class="fas fa-clock"></i>Last contact '+a.days+' days ago'+daysWarning+'</div>' +
       '<div class="detail-tag"><i class="fas fa-phone"></i>'+a.activities30d+' activities (30d)</div>' +
-      '<div class="detail-tag"><i class="fas fa-star"></i><span class="stars">'+stars+'</span></div>' +
+      '<div class="detail-tag"><i class="fas fa-star"></i><span class="stars">'+starsHtml+'</span></div>' +
       '<div class="detail-tag"><i class="fas fa-chart-line"></i>YoY '+(a.yoy>=0?'+':'')+a.yoy+'%</div>' +
     '</div>' +
     '<div class="detail-actions">' +
