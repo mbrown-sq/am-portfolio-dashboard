@@ -990,9 +990,20 @@ function churnRiskFraming(a) {
     lines.push({type:'responsive', icon:'⏰', text:'<strong>Responsiveness gap:</strong> ' + a.days + ' days since last DM. Even if everything is fine, silence can feel like indifference. A quick check-in shows you\'re paying attention.'});
   }
   
-  // High-value retention framing
+  // Comp impact framing — GPV Growth & Retention is 60% of variable comp
+  // Calculate this seller's share of the AM's total portfolio GPV
+  var amKey = a.am;
+  var amPortfolioGpv = 0;
+  accounts.forEach(function(acc){ if (acc.am === amKey) amPortfolioGpv += acc.gpv; });
+  var sellerPctOfPortfolio = amPortfolioGpv > 0 ? (a.gpv / amPortfolioGpv * 100) : 0;
+  
   if (a.risk === 'at-risk' || (a.velocity < -10 && a.gpv > 0.5)) {
-    lines.push({type:'value', icon:'💰', text:'This seller represents <strong>' + gpvStr + ' in annual GPV</strong> and <strong>A$' + (a.ar).toLocaleString('en-AU',{maximumFractionDigits:0}) + ' in revenue</strong>. Losing them doesn\'t just hurt your portfolio — it\'s real dollars walking out the door.'});
+    var gpvImpact = sellerPctOfPortfolio.toFixed(1);
+    var arImpact = 'A$' + (a.ar).toLocaleString('en-AU',{maximumFractionDigits:0});
+    lines.push({type:'value', icon:'💰', text:'<strong>Comp impact:</strong> This seller represents <strong>' + gpvStr + '</strong> in annual GPV — that\'s <strong>' + gpvImpact + '% of your portfolio</strong>. Churning this account would directly reduce your GPV Growth & Retention attainment (60% of variable comp). They also generate <strong>' + arImpact + ' in AR</strong> which flows into your AR Growth metric (40% of comp). Protecting this seller protects your payout.'});
+  } else if (a.gpv > 1.0) {
+    var gpvImpact = sellerPctOfPortfolio.toFixed(1);
+    lines.push({type:'value', icon:'💰', text:'<strong>Portfolio weight:</strong> At <strong>' + gpvStr + '</strong>, this seller is <strong>' + gpvImpact + '% of your total portfolio GPV</strong>. Under the GPV Growth & Retention metric (60% of comp), retaining and growing this account has outsized impact on your attainment. ' + (a.contract ? 'As a contract account, they also contribute to your <strong>Contract Multiplier</strong> (1.1x on contracted GPV).' : 'Getting them onto a contract would unlock the <strong>1.1x Contract Multiplier</strong> on their GPV — worth an additional A$' + ((a.gpv * 0.1) * 1000000 / 1000).toFixed(0) + 'K in attainment credit.')});
   }
   
   // Payments-only at-risk segment
