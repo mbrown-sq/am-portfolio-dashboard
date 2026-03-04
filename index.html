@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AU SMB Portfolio Health Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+<style>
+:root {
+  --bg: #0f1923;
+  --bg2: #162231;
+  --bg3: #1c2d3f;
+  --bg4: #243a50;
+  --blue: #006AFF;
+  --blue-light: #338bff;
+  --blue-dim: rgba(0,106,255,0.15);
+  --green: #00c853;
+  --green-dim: rgba(0,200,83,0.15);
+  --yellow: #ffc107;
+  --yellow-dim: rgba(255,193,7,0.15);
+  --red: #ff3d57;
+  --red-dim: rgba(255,61,87,0.15);
+  --orange: #ff9800;
+  --text: #e8edf2;
+  --text2: #9bafc4;
+  --text3: #5e7a94;
+  --border: #1e3347;
+  --radius: 8px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); overflow-x:hidden; }
+::-webkit-scrollbar { width:6px; height:6px; }
+::-webkit-scrollbar-track { background:var(--bg2); }
+::-webkit-scrollbar-thumb { background:var(--bg4); border-radius:3px; }
+::-webkit-scrollbar-thumb:hover { background:var(--blue); }
+
+/* TOP BAR */
+.topbar {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 24px; background:var(--bg2); border-bottom:1px solid var(--border);
+  position:sticky; top:0; z-index:100;
+}
+.topbar-left h1 { font-size:16px; font-weight:700; color:var(--text); letter-spacing:-0.3px; }
+.topbar-left h1 span { color:var(--blue); }
+.topbar-left p { font-size:11px; color:var(--text3); margin-top:2px; }
+.topbar-right { display:flex; align-items:center; gap:12px; }
+.am-select {
+  background:var(--bg3); border:1px solid var(--border); color:var(--text);
+  padding:8px 14px; border-radius:var(--radius); font-size:12px; font-family:'Inter',sans-serif;
+  cursor:pointer; min-width:220px; outline:none;
+}
+.am-select:focus { border-color:var(--blue); }
+.am-select option { background:var(--bg2); }
+.badge-ramping {
+  font-size:9px; background:var(--blue-dim); color:var(--blue-light);
+  padding:2px 6px; border-radius:3px; font-weight:600;
+}
+.badge-leave {
+  font-size:9px; background:var(--red-dim); color:var(--red);
+  padding:2px 6px; border-radius:3px; font-weight:600;
+}
+
+/* KPI CARDS */
+.kpi-row {
+  display:grid; grid-template-columns:repeat(5,1fr); gap:12px;
+  padding:16px 24px;
+}
+.kpi-card {
+  background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius);
+  padding:16px; position:relative; overflow:hidden; transition:all .2s;
+}
+.kpi-card:hover { border-color:var(--blue); transform:translateY(-1px); }
+.kpi-card .kpi-label { font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.8px; font-weight:600; }
+.kpi-card .kpi-value { font-size:26px; font-weight:800; margin-top:6px; letter-spacing:-1px; }
+.kpi-card .kpi-sub { font-size:10px; color:var(--text3); margin-top:4px; }
+.kpi-card.blue .kpi-value { color:var(--blue-light); }
+.kpi-card.green .kpi-value { color:var(--green); }
+.kpi-card.red .kpi-value { color:var(--red); }
+.kpi-card.yellow .kpi-value { color:var(--yellow); }
+.kpi-card .kpi-icon {
+  position:absolute; right:12px; top:12px; font-size:20px; opacity:0.15;
+}
+.kpi-card.blue .kpi-icon { color:var(--blue); }
+.kpi-card.green .kpi-icon { color:var(--green); }
+.kpi-card.red .kpi-icon { color:var(--red); }
+.kpi-card.yellow .kpi-icon { color:var(--yellow); }
+.kpi-accent {
+  position:absolute; top:0; left:0; right:0; height:3px;
+}
+.kpi-card.blue .kpi-accent { background:var(--blue); }
+.kpi-card.green .kpi-accent { background:var(--green); }
+.kpi-card.red .kpi-accent { background:var(--red); }
+.kpi-card.yellow .kpi-accent { background:var(--yellow); }
+
+/* MAIN CONTENT */
+.main-content {
+  display:grid; grid-template-columns:60% 40%; gap:0;
+  padding:0 24px; min-height:0;
+}
+.panel {
+  background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius);
+  overflow:hidden;
+}
+.panel-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 16px; border-bottom:1px solid var(--border);
+}
+.panel-title { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; }
+.panel-title i { color:var(--blue); margin-right:6px; }
+
+/* TABLE PANEL */
+.table-panel { margin-right:6px; }
+.table-controls {
+  display:flex; align-items:center; gap:8px; padding:10px 16px;
+  border-bottom:1px solid var(--border); flex-wrap:wrap;
+}
+.search-box {
+  background:var(--bg3); border:1px solid var(--border); color:var(--text);
+  padding:6px 12px 6px 30px; border-radius:var(--radius); font-size:11px;
+  font-family:'Inter',sans-serif; outline:none; width:180px; position:relative;
+}
+.search-box:focus { border-color:var(--blue); }
+.search-wrap { position:relative; }
+.search-wrap i { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text3); font-size:11px; }
+.filter-btn {
+  background:var(--bg3); border:1px solid var(--border); color:var(--text2);
+  padding:5px 12px; border-radius:var(--radius); font-size:10px; cursor:pointer;
+  font-family:'Inter',sans-serif; font-weight:600; transition:all .15s;
+}
+.filter-btn:hover { border-color:var(--blue); color:var(--text); }
+.filter-btn.active { background:var(--blue-dim); border-color:var(--blue); color:var(--blue-light); }
+.filter-btn.risk-red.active { background:var(--red-dim); border-color:var(--red); color:var(--red); }
+.filter-btn.risk-yellow.active { background:var(--yellow-dim); border-color:var(--yellow); color:var(--yellow); }
+.filter-btn.risk-green.active { background:var(--green-dim); border-color:var(--green); color:var(--green); }
+
+.data-table { width:100%; border-collapse:collapse; }
+.data-table thead th {
+  font-size:9px; text-transform:uppercase; letter-spacing:0.8px; color:var(--text3);
+  padding:8px 10px; text-align:left; border-bottom:1px solid var(--border);
+  cursor:pointer; user-select:none; white-space:nowrap; font-weight:600;
+}
+.data-table thead th:hover { color:var(--blue-light); }
+.data-table thead th .sort-icon { margin-left:3px; font-size:8px; }
+.data-table tbody tr {
+  border-bottom:1px solid rgba(30,51,71,0.5); transition:background .15s;
+}
+.data-table tbody tr:hover { background:rgba(0,106,255,0.05); }
+.data-table tbody td { padding:7px 10px; font-size:11px; white-space:nowrap; }
+.cat-icon { width:22px; height:22px; border-radius:5px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; }
+.cat-food { background:rgba(255,152,0,0.15); color:var(--orange); }
+.cat-retail { background:var(--blue-dim); color:var(--blue-light); }
+.cat-beauty { background:rgba(233,30,99,0.15); color:#e91e63; }
+.cat-fitness { background:var(--green-dim); color:var(--green); }
+.cat-services { background:rgba(156,39,176,0.15); color:#ce93d8; }
+.cat-events { background:var(--yellow-dim); color:var(--yellow); }
+.cat-drinks { background:rgba(0,188,212,0.15); color:#00bcd4; }
+
+.gpv-badge {
+  font-size:9px; padding:2px 8px; border-radius:10px; font-weight:700;
+}
+.gpv-tier1 { background:rgba(0,106,255,0.2); color:var(--blue-light); }
+.gpv-tier2 { background:rgba(0,200,83,0.15); color:var(--green); }
+.gpv-tier3 { background:rgba(255,193,7,0.12); color:var(--yellow); }
+
+.yoy-pos { color:var(--green); }
+.yoy-neg { color:var(--red); }
+
+.health-bar-wrap { width:60px; height:6px; background:var(--bg); border-radius:3px; overflow:hidden; }
+.health-bar-fill { height:100%; border-radius:3px; transition:width .3s; }
+
+.risk-flag {
+  font-size:9px; padding:2px 8px; border-radius:10px; font-weight:700;
+}
+.risk-healthy { background:var(--green-dim); color:var(--green); }
+.risk-watch { background:var(--yellow-dim); color:var(--yellow); }
+.risk-at-risk { background:var(--red-dim); color:var(--red); }
+
+.table-scroll { max-height:340px; overflow-y:auto; }
+.table-footer {
+  padding:8px 16px; border-top:1px solid var(--border);
+  font-size:10px; color:var(--text3); display:flex; justify-content:space-between;
+}
+
+/* ALERTS PANEL */
+.alerts-panel { margin-left:6px; }
+.alerts-scroll { max-height:340px; overflow-y:auto; padding:8px; }
+.alert-item {
+  background:var(--bg3); border:1px solid var(--border); border-left:3px solid var(--red);
+  border-radius:var(--radius); padding:10px 12px; margin-bottom:6px;
+  display:flex; align-items:flex-start; gap:10px; transition:all .2s;
+}
+.alert-item:hover { border-left-color:var(--orange); }
+.alert-item.dismissed { opacity:0.3; transform:scale(0.98); }
+.alert-icon { color:var(--red); font-size:14px; margin-top:2px; flex-shrink:0; }
+.alert-body { flex:1; min-width:0; }
+.alert-name { font-size:11px; font-weight:700; color:var(--text); }
+.alert-meta { font-size:10px; color:var(--text3); margin-top:2px; }
+.alert-meta span { color:var(--red); font-weight:600; }
+.alert-reason { font-size:10px; color:var(--yellow); margin-top:3px; }
+.alert-dismiss {
+  background:none; border:1px solid var(--border); color:var(--text3);
+  width:22px; height:22px; border-radius:50%; cursor:pointer; font-size:9px;
+  display:flex; align-items:center; justify-content:center; transition:all .15s;
+  flex-shrink:0;
+}
+.alert-dismiss:hover { border-color:var(--red); color:var(--red); background:var(--red-dim); }
+
+/* BOTTOM GRID */
+.bottom-grid {
+  display:grid; grid-template-columns:35% 35% 30%; gap:12px;
+  padding:12px 24px 16px;
+}
+.bottom-grid .panel { min-height:0; }
+
+/* SVG CHART */
+.chart-container { padding:12px 16px; }
+svg text { font-family:'Inter',sans-serif; }
+
+/* ACTIVITY BARS */
+.activity-scroll { padding:10px 16px; max-height:220px; overflow-y:auto; }
+.activity-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.activity-label { font-size:10px; color:var(--text2); width:70px; text-align:right; flex-shrink:0; font-weight:500; }
+.activity-bar-wrap { flex:1; height:18px; background:var(--bg); border-radius:4px; overflow:hidden; display:flex; position:relative; }
+.activity-seg { height:100%; transition:width .3s; position:relative; }
+.activity-seg.calls { background:var(--blue); }
+.activity-seg.email { background:var(--green); }
+.activity-seg.sms { background:var(--orange); }
+.activity-total { font-size:10px; color:var(--text2); width:30px; text-align:right; font-weight:700; flex-shrink:0; }
+.activity-legend { display:flex; gap:14px; padding:8px 16px; border-top:1px solid var(--border); }
+.legend-item { display:flex; align-items:center; gap:4px; font-size:9px; color:var(--text3); }
+.legend-dot { width:8px; height:8px; border-radius:2px; }
+
+/* QTD TABLE */
+.qtd-scroll { padding:8px 12px; max-height:220px; overflow-y:auto; }
+.qtd-section { margin-bottom:10px; }
+.qtd-section-title {
+  font-size:9px; text-transform:uppercase; letter-spacing:0.8px;
+  color:var(--blue-light); font-weight:700; margin-bottom:6px;
+  padding-bottom:4px; border-bottom:1px solid var(--border);
+}
+.qtd-row { display:flex; align-items:center; justify-content:space-between; padding:3px 0; }
+.qtd-name { font-size:10px; color:var(--text2); }
+.qtd-val { font-size:11px; font-weight:700; color:var(--text); }
+.qtd-bar-wrap { flex:1; height:4px; background:var(--bg); border-radius:2px; margin:0 10px; max-width:80px; }
+.qtd-bar-fill { height:100%; border-radius:2px; background:var(--blue); }
+
+/* FOOTER */
+.footer {
+  padding:10px 24px; border-top:1px solid var(--border);
+  display:flex; justify-content:space-between; align-items:center;
+  font-size:9px; color:var(--text3);
+}
+.footer a { color:var(--blue); text-decoration:none; }
+
+/* TRANSITIONS */
+.fade-in { animation: fadeIn .3s ease; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+
+@media (max-width:1200px) {
+  .main-content { grid-template-columns:1fr; }
+  .table-panel, .alerts-panel { margin:0 0 12px 0; }
+  .bottom-grid { grid-template-columns:1fr; }
+  .kpi-row { grid-template-columns:repeat(3,1fr); }
+}
+</style>
+  <script type="application/ld+json">
+{
+  "@context": "urn:goose.ai:schema",
+  "@type": "GooseApp",
+  "name": "au-smb-portfolio-dashboard",
+  "description": "AU SMB Portfolio Health Dashboard for Mallory Brown's team at Square with KPIs, alerts, and activity tracking.",
+  "width": 1600,
+  "height": 1100,
+  "resizable": true,
+  "mcpServers": [
+    "apps"
+  ]
+}
+  </script>
+  <script type="application/x-goose-prd">
+
+AM Portfolio Health Dashboard for Mallory Brown's AU SMB team at Square. Dark theme (#0f1923 bg, #006AFF blue accents). AUD currency.
+
+TOP BAR: Title "AU SMB Portfolio Health Dashboard", subtitle "Team Lead: Mallory Brown • Mar 4, 2026". AM dropdown selector filtering all sections.
+
+5 KPI CARDS: Total Accounts 1728, Portfolio GPV A$839.1M, Active Merchants 2008, At-Risk 213 (red), Watch 1077 (yellow).
+
+MAIN TABLE (left 60%): Sortable accounts with search box and risk filter buttons. Columns: Name, Category icon, GPV Tier badge, GPV, YoY%, Days Since Activity, Health bar, Risk flag. Include 15+ real AU business accounts per AM with mix of healthy/watch/at-risk.
+
+ALERTS PANEL (right 40% top): Scrollable list of 10 at-risk accounts with dismiss buttons showing business name, AM, days since contact, GPV decline reason.
+
+GPV TREND (bottom left): SVG line chart, 6 months: Sep $70.7M, Oct $78.4M, Nov $79.3M, Dec $81.2M, Jan $76.3M, Feb $71.9M.
+
+ACTIVITY PANEL (bottom center): Horizontal stacked bar chart showing this week's activities per AM.
+
+QTD METRICS (bottom right): Small table of dials, DM calls, new seller breadth per AM.
+
+AM DATA for dropdown filtering:
+All Team: 1728 accts, A$839.1M
+Antony Haddrick: 431 accts, A$181.4M, top accounts Frank Green A$3.3M retail +48%, Boost Juice A$2.7M food +11%, Zambrero A$2.4M food +15%, Lovisa A$1.8M retail +20%, Cotton On A$1.6M retail +5%
+Simran Sandhu: 265 accts, A$148.4M, top Gather'd Hospitality A$6.2M food +20%, Bluebottle Coffee A$2.8M food +15%, Priceline A$2.1M retail +5%
+Pascale Dexter: 290 accts, A$127.3M, top Sunshine Coast Food Trucks A$5.0M food +22%, Gold Class Nails A$3.4M beauty +19%
+Liv McDonald: 323 accts, A$177.6M, top Liberty Hall A$4.6M food +8%, Guzman y Gomez A$3.5M food +22%
+Mitch Langdon: 287 accts, A$152.7M, top GYG West A$3.1M food +18%, San Churro A$2.5M food +9%
+Victoria Fabian: 48 accts, A$12.4M, top Archie Rose A$1.2M food +25%
+Eitan Dankner: 69 accts, A$30.5M (RAMPING)
+Elena Kingham: 11 accts, A$5.6M (RAMPING)
+Emily Desmond: 4 accts, A$3.2M (ON LEAVE)
+
+ALERTS: oz laziko 999 days no contact GPV dropping, BROOKFIELD SHOW SOCIETY 181 days, ACIA BAR 133 days GPV -30%, Uncle Don South City 85 days, Curves Gym 70 days GPV -15%, Pie Face 65 days GPV -20%
+
+WEEKLY ACTIVITY (this week): Antony 143 (108 calls 22 email 13 sms), Elena 127 (87 calls 9 email 28 sms), Victoria 103 (44 calls 13 email 44 sms), Eitan 73 (70 calls 3 sms), Pascale 57 (40 calls 10 email), Mitch 50 (27 calls 11 email 12 sms), Simran 45 (24 calls 19 email), Emily 12, Liv 8
+
+QTD: Dials - Elena 39, Eitan 24, Antony 20, Pascale 13, Simran 7, Victoria 6, Mitch 4, Liv 1. DM Calls - Antony 10, Pascale 7, Eitan 6, Elena 4, Victoria 4. New Seller - Eitan 5, Antony 3, Elena 3, Pascale 2.
+
+FOOTER: Data sources and refresh timestamp. CSS Grid layout, smooth transitions, responsive.
+
+  </script>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <h1><i class="fas fa-chart-line" style="color:var(--blue);margin-right:8px;font-size:14px;"></i>AU SMB Portfolio Health <span>Dashboard</span></h1>
+    <p>Team Lead: Mallory Brown &bull; Mar 4, 2026 &bull; Square AU</p>
+  </div>
+  <div class="topbar-right">
+    <select class="am-select" id="amSelect">
+      <option value="all">All Team — 1,728 accts • A$839.1M</option>
+      <option value="antony">Antony Haddrick — 431 accts • A$181.4M</option>
+      <option value="simran">Simran Sandhu — 265 accts • A$148.4M</option>
+      <option value="pascale">Pascale Dexter — 290 accts • A$127.3M</option>
+      <option value="liv">Liv McDonald — 323 accts • A$177.6M</option>
+      <option value="mitch">Mitch Langdon — 287 accts • A$152.7M</option>
+      <option value="victoria">Victoria Fabian — 48 accts • A$12.4M</option>
+      <option value="eitan">Eitan Dankner — 69 accts • A$30.5M ⚡ RAMPING</option>
+      <option value="elena">Elena Kingham — 11 accts • A$5.6M ⚡ RAMPING</option>
+      <option value="emily">Emily Desmond — 4 accts • A$3.2M 🏖 ON LEAVE</option>
+    </select>
+  </div>
+</div>
+
+<!-- KPI CARDS -->
+<div class="kpi-row" id="kpiRow"></div>
+
+<!-- MAIN CONTENT -->
+<div class="main-content">
+  <div class="panel table-panel">
+    <div class="panel-header">
+      <div class="panel-title"><i class="fas fa-building"></i>Account Portfolio</div>
+      <span id="tableCount" style="font-size:10px;color:var(--text3);"></span>
+    </div>
+    <div class="table-controls">
+      <div class="search-wrap">
+        <i class="fas fa-search"></i>
+        <input type="text" class="search-box" id="searchBox" placeholder="Search accounts...">
+      </div>
+      <button class="filter-btn active" data-filter="all" onclick="setFilter('all',this)">All</button>
+      <button class="filter-btn risk-green" data-filter="healthy" onclick="setFilter('healthy',this)">Healthy</button>
+      <button class="filter-btn risk-yellow" data-filter="watch" onclick="setFilter('watch',this)">Watch</button>
+      <button class="filter-btn risk-red" data-filter="at-risk" onclick="setFilter('at-risk',this)">At-Risk</button>
+    </div>
+    <div class="table-scroll" id="tableScroll">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th onclick="sortTable(0)">Name <span class="sort-icon">⇅</span></th>
+            <th onclick="sortTable(1)">Cat</th>
+            <th onclick="sortTable(2)">GPV Tier</th>
+            <th onclick="sortTable(3)">GPV (A$)</th>
+            <th onclick="sortTable(4)">YoY%</th>
+            <th onclick="sortTable(5)">Days</th>
+            <th onclick="sortTable(6)">Health</th>
+            <th onclick="sortTable(7)">Risk</th>
+            <th>AM</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    <div class="table-footer">
+      <span id="tableInfo">Showing all accounts</span>
+      <span>Sorted by GPV descending</span>
+    </div>
+  </div>
+
+  <div class="panel alerts-panel">
+    <div class="panel-header">
+      <div class="panel-title"><i class="fas fa-exclamation-triangle"></i>At-Risk Alerts</div>
+      <span id="alertCount" style="font-size:10px;color:var(--red);font-weight:700;"></span>
+    </div>
+    <div class="alerts-scroll" id="alertsScroll"></div>
+  </div>
+</div>
+
+<!-- BOTTOM GRID -->
+<div class="bottom-grid">
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title"><i class="fas fa-chart-area"></i>GPV Trend (6 Mo)</div>
+    </div>
+    <div class="chart-container" id="gpvChart"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title"><i class="fas fa-phone-alt"></i>Weekly Activity</div>
+      <span style="font-size:9px;color:var(--text3);">This Week</span>
+    </div>
+    <div class="activity-scroll" id="activityBars"></div>
+    <div class="activity-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--blue);"></div>Calls</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--green);"></div>Email</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--orange);"></div>SMS</div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title"><i class="fas fa-bullseye"></i>QTD Metrics</div>
+    </div>
+    <div class="qtd-scroll" id="qtdPanel"></div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <span>Data Sources: Square Dashboard API, Salesforce CRM, Looker BI &bull; Currency: AUD</span>
+  <span>Last refreshed: Mar 4, 2026 09:14 AEDT &bull; Auto-refresh: 15 min</span>
+</div>
+
+<script>
+// ===== DATA =====
+const amData = {
+  all: { name:'All Team', accts:1728, gpv:839.1, active:2008, atRisk:213, watch:1077 },
+  antony: { name:'Antony Haddrick', accts:431, gpv:181.4, active:502, atRisk:53, watch:269 },
+  simran: { name:'Simran Sandhu', accts:265, gpv:148.4, active:310, atRisk:33, watch:165 },
+  pascale: { name:'Pascale Dexter', accts:290, gpv:127.3, active:338, atRisk:36, watch:181 },
+  liv: { name:'Liv McDonald', accts:323, gpv:177.6, active:377, atRisk:40, watch:201 },
+  mitch: { name:'Mitch Langdon', accts:287, gpv:152.7, active:335, atRisk:35, watch:179 },
+  victoria: { name:'Victoria Fabian', accts:48, gpv:12.4, active:56, atRisk:6, watch:30 },
+  eitan: { name:'Eitan Dankner', accts:69, gpv:30.5, active:80, atRisk:5, watch:28, ramping:true },
+  elena: { name:'Elena Kingham', accts:11, gpv:5.6, active:13, atRisk:3, watch:14, ramping:true },
+  emily: { name:'Emily Desmond', accts:4, gpv:3.2, active:5, atRisk:2, watch:10, onLeave:true }
+};
+
+const accounts = [
+  { name:'Gather\'d Hospitality', cat:'food', tier:1, gpv:6.2, yoy:20, days:3, health:92, risk:'healthy', am:'simran' },
+  { name:'Sunshine Coast Food Trucks', cat:'food', tier:1, gpv:5.0, yoy:22, days:5, health:95, risk:'healthy', am:'pascale' },
+  { name:'Liberty Hall', cat:'food', tier:1, gpv:4.6, yoy:8, days:7, health:78, risk:'watch', am:'liv' },
+  { name:'Guzman y Gomez', cat:'food', tier:1, gpv:3.5, yoy:22, days:2, health:96, risk:'healthy', am:'liv' },
+  { name:'Gold Class Nails', cat:'beauty', tier:1, gpv:3.4, yoy:19, days:4, health:90, risk:'healthy', am:'pascale' },
+  { name:'Frank Green', cat:'retail', tier:1, gpv:3.3, yoy:48, days:1, health:98, risk:'healthy', am:'antony' },
+  { name:'GYG West', cat:'food', tier:1, gpv:3.1, yoy:18, days:6, health:88, risk:'healthy', am:'mitch' },
+  { name:'Bluebottle Coffee', cat:'drinks', tier:1, gpv:2.8, yoy:15, days:3, health:91, risk:'healthy', am:'simran' },
+  { name:'Boost Juice', cat:'food', tier:1, gpv:2.7, yoy:11, days:8, health:85, risk:'healthy', am:'antony' },
+  { name:'San Churro', cat:'food', tier:2, gpv:2.5, yoy:9, days:12, health:80, risk:'watch', am:'mitch' },
+  { name:'Zambrero', cat:'food', tier:2, gpv:2.4, yoy:15, days:5, health:89, risk:'healthy', am:'antony' },
+  { name:'Priceline', cat:'retail', tier:2, gpv:2.1, yoy:5, days:14, health:72, risk:'watch', am:'simran' },
+  { name:'Lovisa', cat:'retail', tier:2, gpv:1.8, yoy:20, days:3, health:93, risk:'healthy', am:'antony' },
+  { name:'Cotton On', cat:'retail', tier:2, gpv:1.6, yoy:5, days:18, health:68, risk:'watch', am:'antony' },
+  { name:'Archie Rose', cat:'drinks', tier:2, gpv:1.2, yoy:25, days:2, health:94, risk:'healthy', am:'victoria' },
+  { name:'oz laziko', cat:'services', tier:3, gpv:0.4, yoy:-45, days:999, health:5, risk:'at-risk', am:'antony' },
+  { name:'BROOKFIELD SHOW SOCIETY', cat:'events', tier:3, gpv:0.3, yoy:-12, days:181, health:18, risk:'at-risk', am:'pascale' },
+  { name:'ACIA BAR', cat:'food', tier:3, gpv:0.5, yoy:-30, days:133, health:15, risk:'at-risk', am:'simran' },
+  { name:'Uncle Don South City', cat:'food', tier:3, gpv:0.6, yoy:-8, days:85, health:28, risk:'at-risk', am:'liv' },
+  { name:'Curves Gym', cat:'fitness', tier:3, gpv:0.7, yoy:-15, days:70, health:32, risk:'at-risk', am:'mitch' },
+  { name:'Pie Face', cat:'food', tier:3, gpv:0.9, yoy:-20, days:65, health:30, risk:'at-risk', am:'antony' },
+  { name:'Bondi Hardware', cat:'food', tier:2, gpv:1.4, yoy:7, days:22, health:65, risk:'watch', am:'liv' },
+  { name:'Messina Gelato', cat:'food', tier:2, gpv:1.9, yoy:12, days:9, health:82, risk:'healthy', am:'mitch' },
+  { name:'Grill\'d Burgers', cat:'food', tier:2, gpv:2.0, yoy:3, days:30, health:55, risk:'watch', am:'liv' },
+  { name:'Aesop Retail', cat:'beauty', tier:2, gpv:1.5, yoy:10, days:11, health:79, risk:'watch', am:'simran' },
+  { name:'Bakers Delight', cat:'food', tier:2, gpv:1.3, yoy:-2, days:45, health:42, risk:'watch', am:'antony' },
+  { name:'Nando\'s AU', cat:'food', tier:2, gpv:2.2, yoy:6, days:15, health:74, risk:'watch', am:'pascale' },
+  { name:'Rebel Sport', cat:'retail', tier:2, gpv:1.7, yoy:4, days:20, health:70, risk:'watch', am:'mitch' },
+  { name:'Endota Spa', cat:'beauty', tier:3, gpv:0.8, yoy:8, days:25, health:60, risk:'watch', am:'victoria' },
+  { name:'Fitness First AU', cat:'fitness', tier:2, gpv:1.1, yoy:-5, days:40, health:45, risk:'watch', am:'eitan' },
+  { name:'Crust Pizza', cat:'food', tier:3, gpv:0.9, yoy:14, days:6, health:84, risk:'healthy', am:'elena' },
+  { name:'Lune Croissanterie', cat:'food', tier:3, gpv:0.7, yoy:30, days:4, health:90, risk:'healthy', am:'elena' },
+  { name:'Superdry AU', cat:'retail', tier:3, gpv:0.6, yoy:-3, days:55, health:38, risk:'watch', am:'emily' },
+  { name:'Betty\'s Burgers', cat:'food', tier:2, gpv:1.5, yoy:11, days:8, health:83, risk:'healthy', am:'eitan' },
+  { name:'Chatime AU', cat:'drinks', tier:3, gpv:0.8, yoy:16, days:3, health:88, risk:'healthy', am:'victoria' },
+  { name:'Schnitz', cat:'food', tier:3, gpv:0.6, yoy:5, days:35, health:50, risk:'watch', am:'pascale' },
+  { name:'Muffin Break', cat:'food', tier:3, gpv:0.5, yoy:-1, days:42, health:48, risk:'watch', am:'mitch' },
+  { name:'Soul Origin', cat:'food', tier:3, gpv:0.7, yoy:9, days:10, health:76, risk:'watch', am:'eitan' },
+  { name:'Hoyts Kiosk', cat:'food', tier:3, gpv:0.3, yoy:-18, days:90, health:22, risk:'at-risk', am:'emily' },
+  { name:'Roll\'d Vietnamese', cat:'food', tier:2, gpv:1.1, yoy:13, days:7, health:85, risk:'healthy', am:'liv' },
+  { name:'Gelare', cat:'food', tier:3, gpv:0.4, yoy:-10, days:60, health:35, risk:'watch', am:'eitan' },
+  { name:'Jamaica Blue', cat:'drinks', tier:3, gpv:0.5, yoy:7, days:15, health:72, risk:'watch', am:'simran' },
+  { name:'Ribs & Burgers', cat:'food', tier:2, gpv:1.3, yoy:4, days:19, health:69, risk:'watch', am:'pascale' },
+  { name:'Donut King', cat:'food', tier:3, gpv:0.4, yoy:-7, days:50, health:40, risk:'watch', am:'mitch' },
+  { name:'Oporto', cat:'food', tier:2, gpv:1.6, yoy:8, days:11, health:77, risk:'watch', am:'antony' },
+];
+
+const alerts = [
+  { name:'oz laziko', am:'Antony Haddrick', days:999, reason:'GPV dropping consistently, no contact in 2.7 years' },
+  { name:'BROOKFIELD SHOW SOCIETY', am:'Pascale Dexter', days:181, reason:'Seasonal account, no post-event follow-up' },
+  { name:'ACIA BAR', am:'Simran Sandhu', days:133, reason:'GPV declined -30% QoQ, potential churn' },
+  { name:'Uncle Don South City', am:'Liv McDonald', days:85, reason:'Reduced transaction volume, competitor switch risk' },
+  { name:'Curves Gym', am:'Mitch Langdon', days:70, reason:'GPV -15%, membership cancellations impacting volume' },
+  { name:'Pie Face', am:'Antony Haddrick', days:65, reason:'GPV -20%, store closures reported' },
+  { name:'Hoyts Kiosk', am:'Emily Desmond', days:90, reason:'GPV -18%, AM on leave, needs reassignment' },
+  { name:'Superdry AU', am:'Emily Desmond', days:55, reason:'Declining foot traffic, -3% YoY' },
+  { name:'Fitness First AU', am:'Eitan Dankner', days:40, reason:'GPV -5%, contract renewal due Q2' },
+  { name:'Gelare', am:'Eitan Dankner', days:60, reason:'GPV -10%, seasonal decline or disengagement' },
+];
+
+const weeklyActivity = [
+  { name:'Antony', total:143, calls:108, email:22, sms:13, key:'antony' },
+  { name:'Elena', total:127, calls:87, email:9, sms:28, key:'elena' },
+  { name:'Victoria', total:103, calls:44, email:13, sms:44, key:'victoria' },
+  { name:'Eitan', total:73, calls:70, email:0, sms:3, key:'eitan' },
+  { name:'Pascale', total:57, calls:40, email:10, sms:7, key:'pascale' },
+  { name:'Mitch', total:50, calls:27, email:11, sms:12, key:'mitch' },
+  { name:'Simran', total:45, calls:24, email:19, sms:2, key:'simran' },
+  { name:'Emily', total:12, calls:8, email:3, sms:1, key:'emily' },
+  { name:'Liv', total:8, calls:5, email:2, sms:1, key:'liv' },
+];
+
+const qtdDials = [
+  { name:'Elena', val:39 }, { name:'Eitan', val:24 }, { name:'Antony', val:20 },
+  { name:'Pascale', val:13 }, { name:'Simran', val:7 }, { name:'Victoria', val:6 },
+  { name:'Mitch', val:4 }, { name:'Liv', val:1 }
+];
+const qtdDM = [
+  { name:'Antony', val:10 }, { name:'Pascale', val:7 }, { name:'Eitan', val:6 },
+  { name:'Elena', val:4 }, { name:'Victoria', val:4 }
+];
+const qtdSeller = [
+  { name:'Eitan', val:5 }, { name:'Antony', val:3 }, { name:'Elena', val:3 }, { name:'Pascale', val:2 }
+];
+
+const gpvTrend = [
+  { month:'Sep', val:70.7 }, { month:'Oct', val:78.4 }, { month:'Nov', val:79.3 },
+  { month:'Dec', val:81.2 }, { month:'Jan', val:76.3 }, { month:'Feb', val:71.9 }
+];
+
+const catIcons = {
+  food:'fa-utensils', retail:'fa-shopping-bag', beauty:'fa-spa',
+  fitness:'fa-dumbbell', services:'fa-concierge-bell', events:'fa-ticket-alt', drinks:'fa-coffee'
+};
+
+let currentAM = 'all';
+let currentFilter = 'all';
+let currentSearch = '';
+let sortCol = 3;
+let sortAsc = false;
+
+// ===== RENDER FUNCTIONS =====
+function renderKPIs() {
+  const d = amData[currentAM];
+  const row = document.getElementById('kpiRow');
+  let extra = '';
+  if (d.ramping) extra = ' <span class="badge-ramping">RAMPING</span>';
+  if (d.onLeave) extra = ' <span class="badge-leave">ON LEAVE</span>';
+  row.innerHTML = `
+    <div class="kpi-card blue fade-in">
+      <div class="kpi-accent"></div>
+      <div class="kpi-icon"><i class="fas fa-building"></i></div>
+      <div class="kpi-label">Total Accounts${extra}</div>
+      <div class="kpi-value">${d.accts.toLocaleString()}</div>
+      <div class="kpi-sub">${currentAM==='all'?'Across 9 AMs':d.name}</div>
+    </div>
+    <div class="kpi-card blue fade-in">
+      <div class="kpi-accent"></div>
+      <div class="kpi-icon"><i class="fas fa-dollar-sign"></i></div>
+      <div class="kpi-label">Portfolio GPV</div>
+      <div class="kpi-value">A$${d.gpv.toFixed(1)}M</div>
+      <div class="kpi-sub">Gross Payment Volume</div>
+    </div>
+    <div class="kpi-card green fade-in">
+      <div class="kpi-accent"></div>
+      <div class="kpi-icon"><i class="fas fa-store"></i></div>
+      <div class="kpi-label">Active Merchants</div>
+      <div class="kpi-value">${d.active.toLocaleString()}</div>
+      <div class="kpi-sub">Processed in last 30d</div>
+    </div>
+    <div class="kpi-card red fade-in">
+      <div class="kpi-accent"></div>
+      <div class="kpi-icon"><i class="fas fa-exclamation-circle"></i></div>
+      <div class="kpi-label">At-Risk</div>
+      <div class="kpi-value">${d.atRisk}</div>
+      <div class="kpi-sub">Requires immediate action</div>
+    </div>
+    <div class="kpi-card yellow fade-in">
+      <div class="kpi-accent"></div>
+      <div class="kpi-icon"><i class="fas fa-eye"></i></div>
+      <div class="kpi-label">Watch</div>
+      <div class="kpi-value">${d.watch.toLocaleString()}</div>
+      <div class="kpi-sub">Monitor closely</div>
+    </div>
+  `;
+}
+
+function getFilteredAccounts() {
+  let list = accounts;
+  if (currentAM !== 'all') list = list.filter(a => a.am === currentAM);
+  if (currentFilter !== 'all') list = list.filter(a => a.risk === currentFilter);
+  if (currentSearch) {
+    const s = currentSearch.toLowerCase();
+    list = list.filter(a => a.name.toLowerCase().includes(s));
+  }
+  list.sort((a, b) => {
+    let va, vb;
+    switch(sortCol) {
+      case 0: va=a.name.toLowerCase(); vb=b.name.toLowerCase(); return sortAsc?va.localeCompare(vb):vb.localeCompare(va);
+      case 1: va=a.cat; vb=b.cat; return sortAsc?va.localeCompare(vb):vb.localeCompare(va);
+      case 2: va=a.tier; vb=b.tier; return sortAsc?va-vb:vb-va;
+      case 3: va=a.gpv; vb=b.gpv; return sortAsc?va-vb:vb-va;
+      case 4: va=a.yoy; vb=b.yoy; return sortAsc?va-vb:vb-va;
+      case 5: va=a.days; vb=b.days; return sortAsc?va-vb:vb-va;
+      case 6: va=a.health; vb=b.health; return sortAsc?va-vb:vb-va;
+      case 7: const ro={healthy:0,watch:1,'at-risk':2}; va=ro[a.risk]; vb=ro[b.risk]; return sortAsc?va-vb:vb-va;
+      default: return 0;
+    }
+  });
+  return list;
+}
+
+function renderTable() {
+  const list = getFilteredAccounts();
+  const tbody = document.getElementById('tableBody');
+  const amNames = { antony:'AH', simran:'SS', pascale:'PD', liv:'LM', mitch:'ML', victoria:'VF', eitan:'ED', elena:'EK', emily:'EmD' };
+  tbody.innerHTML = list.map(a => {
+    const tierLabel = a.tier===1?'Tier 1':a.tier===2?'Tier 2':'Tier 3';
+    const tierClass = a.tier===1?'gpv-tier1':a.tier===2?'gpv-tier2':'gpv-tier3';
+    const healthColor = a.health>=70?'var(--green)':a.health>=40?'var(--yellow)':'var(--red)';
+    const riskLabel = a.risk==='at-risk'?'At-Risk':a.risk==='watch'?'Watch':'Healthy';
+    const riskClass = 'risk-'+a.risk;
+    return `<tr class="fade-in">
+      <td style="font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;" title="${a.name}">${a.name}</td>
+      <td><span class="cat-icon cat-${a.cat}"><i class="fas ${catIcons[a.cat]}"></i></span></td>
+      <td><span class="gpv-badge ${tierClass}">${tierLabel}</span></td>
+      <td style="font-weight:700;">$${a.gpv.toFixed(1)}M</td>
+      <td class="${a.yoy>=0?'yoy-pos':'yoy-neg'}" style="font-weight:600;">${a.yoy>=0?'+':''}${a.yoy}%</td>
+      <td style="color:${a.days>60?'var(--red)':a.days>30?'var(--yellow)':'var(--text2)'};font-weight:${a.days>60?'700':'400'};">${a.days}</td>
+      <td><div class="health-bar-wrap"><div class="health-bar-fill" style="width:${a.health}%;background:${healthColor};"></div></div></td>
+      <td><span class="risk-flag ${riskClass}">${riskLabel}</span></td>
+      <td style="color:var(--text3);font-size:10px;">${amNames[a.am]||a.am}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('tableCount').textContent = list.length + ' accounts';
+  document.getElementById('tableInfo').textContent = `Showing ${list.length} of ${currentAM==='all'?accounts.length:accounts.filter(a=>a.am===currentAM).length} accounts`;
+}
+
+function renderAlerts() {
+  const scroll = document.getElementById('alertsScroll');
+  let filtered = alerts;
+  if (currentAM !== 'all') {
+    const amFullName = amData[currentAM].name;
+    filtered = alerts.filter(a => a.am === amFullName);
+  }
+  document.getElementById('alertCount').textContent = filtered.length + ' alerts';
+  scroll.innerHTML = filtered.map((a, i) => `
+    <div class="alert-item fade-in" id="alert-${i}">
+      <div class="alert-icon"><i class="fas fa-exclamation-triangle"></i></div>
+      <div class="alert-body">
+        <div class="alert-name">${a.name}</div>
+        <div class="alert-meta">${a.am} &bull; <span>${a.days} days</span> since contact</div>
+        <div class="alert-reason"><i class="fas fa-info-circle" style="margin-right:4px;"></i>${a.reason}</div>
+      </div>
+      <button class="alert-dismiss" onclick="dismissAlert(${i})" title="Dismiss"><i class="fas fa-times"></i></button>
+    </div>
+  `).join('');
+}
+
+function dismissAlert(i) {
+  const el = document.getElementById('alert-'+i);
+  if (el) { el.classList.add('dismissed'); setTimeout(()=>el.style.display='none',300); }
+}
+
+function renderGPVChart() {
+  const container = document.getElementById('gpvChart');
+  const w=420, h=160, pad={t:20,r:20,b:30,l:50};
+  const cw=w-pad.l-pad.r, ch=h-pad.t-pad.b;
+  const vals = gpvTrend.map(d=>d.val);
+  const minV = Math.floor(Math.min(...vals)-5);
+  const maxV = Math.ceil(Math.max(...vals)+5);
+  const xStep = cw/(vals.length-1);
+  const points = gpvTrend.map((d,i) => {
+    const x = pad.l + i*xStep;
+    const y = pad.t + ch - ((d.val-minV)/(maxV-minV))*ch;
+    return {x,y,val:d.val,month:d.month};
+  });
+  const linePath = points.map((p,i)=>((i===0?'M':'L')+p.x+','+p.y)).join(' ');
+  const areaPath = linePath + ` L${points[points.length-1].x},${pad.t+ch} L${points[0].x},${pad.t+ch} Z`;
+  const gridLines = [minV, minV+Math.round((maxV-minV)/3), minV+Math.round(2*(maxV-minV)/3), maxV].map(v => {
+    const y = pad.t + ch - ((v-minV)/(maxV-minV))*ch;
+    return `<line x1="${pad.l}" y1="${y}" x2="${w-pad.r}" y2="${y}" stroke="rgba(30,51,71,0.6)" stroke-width="1"/>
+            <text x="${pad.l-8}" y="${y+3}" fill="#5e7a94" font-size="9" text-anchor="end">$${v}M</text>`;
+  }).join('');
+  const dots = points.map(p =>
+    `<circle cx="${p.x}" cy="${p.y}" r="4" fill="#006AFF" stroke="#0f1923" stroke-width="2"/>
+     <text x="${p.x}" y="${p.y-10}" fill="#e8edf2" font-size="9" text-anchor="middle" font-weight="600">$${p.val}M</text>`
+  ).join('');
+  const labels = points.map(p =>
+    `<text x="${p.x}" y="${h-5}" fill="#5e7a94" font-size="9" text-anchor="middle">${p.month}</text>`
+  ).join('');
+  container.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="100%" preserveAspectRatio="xMidYMid meet">
+    <defs>
+      <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#006AFF" stop-opacity="0.3"/>
+        <stop offset="100%" stop-color="#006AFF" stop-opacity="0.02"/>
+      </linearGradient>
+    </defs>
+    ${gridLines}
+    <path d="${areaPath}" fill="url(#areaGrad)"/>
+    <path d="${linePath}" fill="none" stroke="#006AFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    ${dots}
+    ${labels}
+  </svg>`;
+}
+
+function renderActivityBars() {
+  const container = document.getElementById('activityBars');
+  const maxTotal = Math.max(...weeklyActivity.map(a=>a.total));
+  let filtered = weeklyActivity;
+  if (currentAM !== 'all') {
+    filtered = weeklyActivity.filter(a => a.key === currentAM);
+  }
+  container.innerHTML = filtered.map(a => {
+    const cw = (a.calls/maxTotal)*100;
+    const ew = (a.email/maxTotal)*100;
+    const sw = (a.sms/maxTotal)*100;
+    return `<div class="activity-row">
+      <div class="activity-label">${a.name}</div>
+      <div class="activity-bar-wrap">
+        <div class="activity-seg calls" style="width:${cw}%;" title="Calls: ${a.calls}"></div>
+        <div class="activity-seg email" style="width:${ew}%;" title="Email: ${a.email}"></div>
+        <div class="activity-seg sms" style="width:${sw}%;" title="SMS: ${a.sms}"></div>
+      </div>
+      <div class="activity-total">${a.total}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderQTD() {
+  const container = document.getElementById('qtdPanel');
+  function renderSection(title, data, maxVal) {
+    let filtered = data;
+    if (currentAM !== 'all') {
+      const shortName = amData[currentAM].name.split(' ')[0];
+      filtered = data.filter(d => d.name === shortName);
+    }
+    const rows = filtered.map(d =>
+      `<div class="qtd-row">
+        <span class="qtd-name">${d.name}</span>
+        <div class="qtd-bar-wrap"><div class="qtd-bar-fill" style="width:${(d.val/maxVal)*100}%;"></div></div>
+        <span class="qtd-val">${d.val}</span>
+      </div>`
+    ).join('');
+    return `<div class="qtd-section"><div class="qtd-section-title">${title}</div>${rows||'<div style="font-size:10px;color:var(--text3);padding:4px 0;">No data</div>'}</div>`;
+  }
+  container.innerHTML =
+    renderSection('Dials', qtdDials, 39) +
+    renderSection('DM Calls', qtdDM, 10) +
+    renderSection('New Seller Breadth', qtdSeller, 5);
+}
+
+function sortTable(col) {
+  if (sortCol === col) sortAsc = !sortAsc;
+  else { sortCol = col; sortAsc = col===0; }
+  renderTable();
+}
+
+function setFilter(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTable();
+}
+
+document.getElementById('searchBox').addEventListener('input', function() {
+  currentSearch = this.value;
+  renderTable();
+});
+
+document.getElementById('amSelect').addEventListener('change', function() {
+  currentAM = this.value;
+  renderKPIs();
+  renderTable();
+  renderAlerts();
+  renderActivityBars();
+  renderQTD();
+});
+
+// INIT
+renderKPIs();
+renderTable();
+renderAlerts();
+renderGPVChart();
+renderActivityBars();
+renderQTD();
+</script>
+</body>
+</html>
