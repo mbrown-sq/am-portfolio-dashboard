@@ -1,8 +1,14 @@
 # AM Portfolio Dashboard — Handoff & Continuation Guide
 
+**Last updated:** 2026-03-05
+**Author:** Mallory Brown, AU SMB Team Lead
+**Built with:** Goose + Snowflake + existing AM data infrastructure. Zero new systems required.
+
+---
+
 ## Quick Start
 
-**Live site:** GitHub Pages (pushes to `main` auto-deploy)
+**Live site:** GitHub Pages (pushes to `main` auto-deploy, live within ~60 seconds)
 **Repo:** https://github.com/mbrown-sq/am-portfolio-dashboard
 **Local path:** `/Users/mbrown/Projects/am-portfolio-dashboard/`
 
@@ -12,6 +18,28 @@ cd /Users/mbrown/Projects/am-portfolio-dashboard
 git add -A && git commit -m "description" && git push origin main
 # Live within ~60 seconds
 ```
+
+**Related docs:**
+- `STRATEGY.md` — Vision, strategy & alignment to Project Orbit and GTM Automation
+- `recipes/seller-signals-agent.yaml` — Goose recipe for live Snowflake data agent (Phase 1 chatbot)
+- AM Comp SMB Metrics Explainer: [go/AMCompHub](https://www.notion.so/square-seller/AM-Comp-SMB-Metrics-Explainer-27f70293beed80bba328ff2c653a614c)
+- SMB AM Seller Account Signals Data Guide (Google Doc — 15 seller signal tables)
+- Data Query Building Blocks for AM Agent (Google Doc — AM performance query patterns)
+
+---
+
+## Project Overview
+
+A **Seller Intelligence Platform** for AU SMB Account Managers — a single-screen tool that transforms raw portfolio data into actionable seller insights, conversation starters, and prioritised next best actions.
+
+**Key stats:**
+- 1,729 AU SMB accounts with full data
+- 99% product adoption coverage (from Snowflake)
+- 9 AMs across the team
+- A$839.2M total portfolio GPV
+- 213 at-risk accounts, 1,078 on watch, 438 healthy
+
+**What it does:** Click one account → see everything: narrative, actions, features, retention risk, products, peers. AM reads for 30 seconds → picks up the phone armed with specific numbers and conversation starters.
 
 ---
 
@@ -44,6 +72,7 @@ const DATA = {
 | `g9` | 9-month trailing GPV (millions) | Original data |
 | `y` | YoY growth % | Original data |
 | `ar` | Annualized revenue (dollars) | Original data |
+| `sar` | SaaS AR (annual, dollars) — used for stickiness assessment | Original data |
 | `at` | Average ticket (dollars) | Original data |
 | `l` | Active locations count | Original data |
 | `tn` | Tenure (months with Square) | Original data |
@@ -62,7 +91,6 @@ const DATA = {
 | `pc` | Postcode | Snowflake: VDIM_USER |
 | `svc` | AM Service Level | Snowflake: AM_FACT_ACCOUNT_OWNERSHIP_V2 |
 | `cls` | Seller Class | Snowflake: AM_FACT_ACCOUNT_OWNERSHIP_V2 |
-| `sar` | SaaS AR (annual, dollars) — used for stickiness assessment | Original data |
 
 **Feature News format** (in `data.js` → `DATA.featureNews`):
 ```javascript
@@ -76,7 +104,7 @@ const DATA = {
 ```
 Match rules: `cat` (array), `minTicket`, `minLocations`, `minGpv`, `hasProduct` (array).
 
-### `index.html` — ALL the UI + logic (~1,200 lines)
+### `index.html` — ALL the UI + logic (~1,800 lines)
 Single-file app. No build step, no dependencies beyond CDN fonts/icons.
 
 **Structure:**
@@ -91,7 +119,7 @@ Single-file app. No build step, no dependencies beyond CDN fonts/icons.
 - `function sellerNarrative(a)` — Know Your Seller text generation
 - `function nextBestActions(a)` — NBA engine (urgent/grow/celebrate)
 - `function matchFeatures(a)` — Feature news matching
-- `function churnRiskFraming(a)` — Retention intelligence
+- `function churnRiskFraming(a)` — Retention intelligence (5-section rewrite)
 - `function sellerMilestones(a)` — Anniversary/growth milestone detection
 - `function findSimilarSellers(a)` — Peer comparison logic
 - `function velocityBadge(vel)` — GPV velocity display
@@ -100,6 +128,11 @@ Single-file app. No build step, no dependencies beyond CDN fonts/icons.
 - `function closeModal()` — Closes the modal
 - `function renderCategoryChart()` — GPV by category panel
 - `function populateAMSelect()` — Dynamic AM dropdown
+
+### `recipes/seller-signals-agent.yaml` — Goose data agent recipe
+A comprehensive Goose recipe that can answer AM questions by querying Snowflake in real-time.
+Covers 25+ data tables across seller signals and AM performance metrics.
+See "Chatbot / Data Agent" section below for details.
 
 ---
 
@@ -159,26 +192,146 @@ SFDC Account ID → SBS_BOOK_OF_BUSINESS_ID_C → BUSINESS_ID (in AM tables)
 
 ---
 
-## What Needs Work
+## Completed Work
 
 ### Retention Intelligence ✅ (rewritten 2026-03-05)
 **File:** `index.html` → search for `function churnRiskFraming(a)`
-**Status:** Rewritten from generic comp-framing to 5-section seller-outcome-focused intelligence.
-**New structure:**
-1. **Churn Pattern Diagnosis** — Failure of Education / Failure of Responsiveness (from Orbit research), with specific conversation openers in blue callout boxes
-2. **Stickiness Assessment** — uses product count, contract status, and SaaS AR (`saasAr` field, mapped from `sar` in data.js) to rate High/Moderate/Low switching cost
-3. **What's at Stake** — portfolio weight + AR impact, only for at-risk or significantly declining accounts. Contract multiplier mentioned only when actionable (non-contracted sellers)
-4. **Category-Specific Risk Signals** — F&B (avg ticket-aware: café vs premium dining), Retail (online channel check), Beauty (Appointments as competitor risk)
-5. **Peer Context** — compares this seller's decline against category-wide trends. Flags outliers vs market-wide issues
+**Status:** Completely rewritten from generic comp-framing to 5-section seller-outcome-focused intelligence.
+
+**What changed:**
+- Removed all generic "protects your payout" and "60% of variable comp" language
+- Added `saasAr` field mapping (from `sar` in data.js) for stickiness assessment
+- Fixed contract multiplier math: now correctly uses **in-quarter GPV** (quarterly), not annualized, per [AM Comp SMB Metrics Explainer](https://www.notion.so/square-seller/AM-Comp-SMB-Metrics-Explainer-27f70293beed80bba328ff2c653a614c)
+- Contract multiplier now references both GPV Growth & Retention (60%) AND AR Growth (40%)
+
+**New 5-section structure:**
+1. **Churn Pattern Diagnosis** — Failure of Education / Failure of Responsiveness (from Project Orbit churned seller research), with specific conversation openers in blue callout boxes. Education risk uses seller name, tenure, and GPV to personalize. Responsiveness risk differentiates between severe decline (>20%) and moderate decline, with different conversation openers for each.
+2. **Stickiness Assessment** — Uses product count, contract status, and SaaS AR to rate:
+   - 🔒 High stickiness (5+ products, contracted, SaaS AR > 0) — "focus on satisfaction, not retention"
+   - 🔓 Moderate stickiness (≤2 products, no contract) — "every product you add creates a reason to stay"
+   - ⚠️ Low stickiness (payments-only, no contract, zero SaaS) — "could switch with zero friction"
+3. **What's at Stake** — Portfolio weight + AR impact, only for at-risk or significantly declining accounts. Contract multiplier mentioned only when actionable (non-contracted sellers >A$500K GPV). Uses quarterly GPV for multiplier math.
+4. **Category-Specific Risk Signals** — F&B (avg ticket-aware: café/QSR vs premium dining), Retail (online channel check), Beauty (Appointments as competitor risk via Fresha/Timely)
+5. **Peer Context** — Compares seller's decline against category-wide trends. "26% of retail sellers declining" = market-wide issue. "Only 8% declining" = outlier, dig deeper.
+
 **Coverage:** 57% of accounts trigger at least one signal (993/1,729)
-**Key change:** Removed "Protecting this seller protects your payout" framing. Now frames around seller outcomes with exact conversation openers.
+
+**Comp accuracy:** Contract multiplier framing verified against [go/AMCompHub](https://www.notion.so/square-seller/AM-Comp-SMB-Metrics-Explainer-27f70293beed80bba328ff2c653a614c):
+- 1.1x multiplier applies to **in-quarter GPV** (not annualized) — quota is quarterly
+- Multiplier applies to **both** GPV Growth & Retention (60% weight) and AR Growth (40% weight)
+- Measured at merchant_token level, not BID level
+
+---
+
+## Chatbot / Data Agent (In Progress)
+
+### Vision
+An embedded chatbot in the dashboard that can answer AM questions by querying Snowflake in real-time. Example questions:
+- "Show me my sellers with recently declining transactions"
+- "Which sellers have hardware approaching end of life?"
+- "How am I pacing to my GPV goal this quarter?"
+- "Who's at highest churn risk in my book?"
+- "What products is Bromley's Bread using?"
+- "How many open CS cases do my sellers have?"
+
+### Architecture (planned)
+```
+AM asks question in dashboard chat
+        ↓
+Frontend sends question + AM context to backend
+        ↓
+Backend (Goose agent / Blockcell / Cloud Function)
+  → Interprets the question
+  → Maps to correct table(s) from data guide
+  → Generates Snowflake SQL (using standardized UDFs)
+  → Executes query (scoped to AM's book via SFDC_OWNER_ID)
+  → Formats results with advisory actions
+        ↓
+Response displayed in chat widget on dashboard
+```
+
+### Phase 1: Goose Recipe ✅ (built 2026-03-05)
+**File:** `recipes/seller-signals-agent.yaml`
+**Status:** Built and committed. Ready for testing.
+
+A comprehensive Goose recipe covering **25+ Snowflake tables** across two knowledge domains:
+
+**Seller Signal Tables (15 tables):**
+| Tier | Table | Schema | Use Case |
+|------|-------|--------|----------|
+| Churn | CHURN_PREDICTIONS_WINBACK | APP_SUPPORT.DATABRICKS_ML | Churn probability, outreach priority |
+| Churn | SHEALTH_RISK_CHURN | APP_RISK.APP_RISK | Risk action impact on retention |
+| Hardware | HARDWARE_REPLACEMENT_SUMMARY | APP_HARDWARE.ADHOC | Warranty expiration, upgrades |
+| Hardware | HARDWARE_CHURN_RESURRECTION | APP_HARDWARE.ADHOC | Inactive hardware re-engagement |
+| Hardware | FIVETRAN.DEVICES.DEVICES | FIVETRAN.DEVICES | Real-time device health |
+| Products | MERCHANT_PRODUCT_EVENTS | APP_SALES.APP_SALES_ETL | Product portfolio, gaps |
+| Products | AM_WINS_UNIFIED_COMBINED | APP_MERCH_GROWTH.APP_MERCH_GROWTH_ETL | Adoption patterns |
+| Products | AM_CROSS_SELL_PRODUCT_EVENTS_COMBINED | AM_ANALYTICS.AM_ANALYTICS_ETL | Conversion blockers |
+| Products | SELLER_INSIGHTS | APP_SALES.APP_SALES_ETL | Pain points, competitors |
+| Engagement | MERCHANT_MESSAGES | APP_MESSENGER.PUBLIC | Notification delivery |
+| Engagement | MERCHANT_MESSAGE_UNIT_CLICKED | CUSTOMER_DATA.MESSAGESERVICE | Notification effectiveness |
+| Engagement | MERCHANT_MESSAGE_UNIT_DISMISSED | CUSTOMER_DATA.MESSAGESERVICE | Notification fatigue |
+| Engagement | MERCHANT_SETTINGS | MESSENGER.RAW_TIDB | Communication preferences |
+| Financial | DEVICE_LTV | APP_HARDWARE.DS_MODELS | Hardware ROI |
+
+**AM Performance Tables (10+ tables):**
+| Category | Table | Use Case |
+|----------|-------|----------|
+| Organization | am_fact_employment_current | LDAP → SFDC_OWNER_ID mapping |
+| Organization | smb_varcomp_gpv_bid_mt_population | AM book composition |
+| Organization | am_fact_employment_historical | IC to Lead mapping |
+| GPV | smb_varcomp_gpv | BID/MT level GPV data |
+| AR | smb_varcomp_ar_added | AR Added/AR Growth |
+| Pacing | pokemon_snap | VC pacing to goal |
+| Activities | am_fact_activities / am_fact_activities_fanout | AM call/email/SMS activity |
+| Contracts | smb_varcomp_contracts_detail / smb_varcomp_contracts_mt_am | Contract eligibility |
+| Support | app_support.cases | CS cases |
+| Classification | am_varcomp_foundational | New vs Mature seller |
+| Locations | vdim_user | Seller location count |
+| Products | vfact_subscription_states_expanded | SaaS product usage |
+| NNRO | nnro_sources_combined / smb_varcomp_nnro_attainment | Net New Retention Outreach |
+
+**Key features baked into the recipe:**
+- Standardized date UDFs (never manual date math)
+- 8 documented anti-patterns to avoid (from AM Performance Building Blocks doc)
+- Advisory playbook with specific thresholds and recommended actions
+- Join patterns for scoping every query to the AM's book
+- AU SMB team filtering
+
+**How to test:**
+```
+# In a new Goose session, load the recipe:
+# Option 1: Load into context
+load the file /Users/mbrown/Projects/am-portfolio-dashboard/recipes/seller-signals-agent.yaml
+
+# Option 2: Ask a question directly
+"I'm an AU SMB AM with LDAP 'antony'. Show me my sellers with highest churn risk."
+```
+
+### Phase 2: Embedded Chat Widget (needs infrastructure)
+Requires:
+- **Blockcell** or **GCP Cloud Function** for the backend (to keep API keys server-side)
+- **Auth** to verify which AM is asking (scope queries to their book)
+- Request Blockcell via internal channels, GCP via https://cloud-portal.sqprod.co/requests/new
+
+### Phase 3: Full Agentic Integration
+- "Prep me for my call with Bromley's Bread" → full briefing generated
+- Auto-draft follow-up emails based on call notes
+- Proactive daily outreach suggestions pushed to each AM
+- Churn prediction model integrated into retention intelligence
+- Voice-to-action: AM speaks call notes, system logs activity and generates next steps
+
+---
+
+## What Still Needs Work
 
 ### Future Enrichment Opportunities
 1. **Google Places API** — ratings, reviews, website, social links. Needs a GCP project (request via https://cloud-portal.sqprod.co/requests/new or #blockplat-help)
 2. **Salesforce fields** — website, phone available in `SFDC_ACCOUNT_RAW_TEMP` but sparse for parent accounts. Child accounts have more data.
-3. **Support ticket data** — recent CS cases would add context ("had 3 support cases last month")
-4. **Churn risk ML score** — if available from data science team
+3. **Support ticket data** — recent CS cases would add context ("had 3 support cases last month"). Table exists: `app_support.app_support.cases`
+4. **Churn risk ML score** — available in `APP_SUPPORT.DATABRICKS_ML.CHURN_PREDICTIONS_WINBACK` (PRED_PROB field). Could be added to data.js.
 5. **Real-time notifications** — Slack integration for alerts when seller GPV drops or milestones hit
+6. **Hardware lifecycle data** — warranty expiration dates from `APP_HARDWARE.ADHOC.HARDWARE_REPLACEMENT_SUMMARY`. Could power proactive upgrade offers.
 
 ### Scalability Path
 Current: Manual data.js generation → git push
@@ -211,21 +364,37 @@ Future: Real-time event-based updates via the GTM Unified Data Layer (see GTM Au
 | Know Your Seller narrative | `sellerNarrative(a)` | All account fields |
 | Next Best Actions | `nextBestActions(a)` | All account fields + features |
 | Feature Awareness | `matchFeatures(a)` / `featureNewsHtml(a)` | DATA.featureNews |
-| Retention Intelligence | `churnRiskFraming(a)` | Account fields + portfolio calc |
+| Retention Intelligence | `churnRiskFraming(a)` | Account fields + portfolio calc + saasAr |
 | Milestones | `sellerMilestones(a)` | tenure, gpv, velocity, products |
 | Peer Benchmarking | `peerBenchmarkHtml(a)` | Category stats computed at load |
 | Similar Sellers | `findSimilarSellers()` / `similarSellersHtml()` | accounts array |
 | Product Adoption pills | In modal build | products field |
 | Salesforce direct links | `squareinc.lightning.force.com/lightning/r/Account/{sf}/view` | sf field |
+| **Goose data agent recipe** | `recipes/seller-signals-agent.yaml` | 25+ Snowflake tables |
 
 ---
 
 ## Tips for Continuing
 
 1. **To edit the narrative:** Search for `function sellerNarrative(a)` — it's one function that generates all the text
-2. **To add a new feature news item:** Edit the `featureNews` array in `data.js` — no code changes needed
-3. **To add a new data field:** Add it to the account objects in `data.js`, then map it in the `const accounts = DATA.accounts.map(...)` block in `index.html`
-4. **To change modal layout:** Search for `function toggleDetail(idx)` — the entire modal HTML is built there
-5. **To add a new filter button:** Add the HTML button, then update `getFilteredAccounts()` to handle the new filter value
-6. **To refresh Snowflake data:** Run the queries above, process with Python, write to data.js, git push
-7. **CSS variables** are at the top of the file (`:root { --bg: #0f1923; ... }`) — change theme here
+2. **To edit retention intelligence:** Search for `function churnRiskFraming(a)` — 5-section structure with conversation openers
+3. **To add a new feature news item:** Edit the `featureNews` array in `data.js` — no code changes needed
+4. **To add a new data field:** Add it to the account objects in `data.js`, then map it in the `const accounts = DATA.accounts.map(...)` block in `index.html`
+5. **To change modal layout:** Search for `function toggleDetail(idx)` — the entire modal HTML is built there
+6. **To add a new filter button:** Add the HTML button, then update `getFilteredAccounts()` to handle the new filter value
+7. **To refresh Snowflake data:** Run the queries above, process with Python, write to data.js, git push
+8. **CSS variables** are at the top of the file (`:root { --bg: #0f1923; ... }`) — change theme here
+9. **To update the Goose recipe:** Edit `recipes/seller-signals-agent.yaml` — add new tables, query patterns, or advisory actions
+10. **For comp accuracy:** Always reference [go/AMCompHub](https://www.notion.so/square-seller/AM-Comp-SMB-Metrics-Explainer-27f70293beed80bba328ff2c653a614c) — contract multiplier is 1.1x on **in-quarter** GPV and AR (quarterly, not annual)
+
+---
+
+## Commit History (key milestones)
+
+| Commit | Date | Description |
+|--------|------|-------------|
+| Initial | 2026-03-04 | Dashboard built in a single day — 1,729 accounts, full UI, seller intelligence |
+| Various | 2026-03-04 | Product adoption enrichment (99% match), location data, peer benchmarking |
+| `ba8592d` | 2026-03-04 | Last commit before Retention Intelligence rewrite |
+| `4eefd66` | 2026-03-05 | **Retention Intelligence rewrite** — 5-section seller-outcome-focused framing, saasAr mapping, comp-accurate contract multiplier |
+| `1e4ad86` | 2026-03-05 | **Goose data agent recipe** — 25+ Snowflake tables, seller signals + AM performance |
