@@ -550,7 +550,9 @@ const accounts = DATA.accounts.map(a => ({
   am: a.am, sf: a.sf, ar: a.ar, at: a.at, locations: a.l,
   tenure: a.tn, contract: a.ct, activities30d: a.a30, csatStars: a.cs, ci: a.ci,
   lastProcessed: a.lp,
-  products: a.products ? a.products.split(',') : []
+  products: a.products ? a.products.split(',') : [],
+  city: a.city || '', state: a.state || '', postcode: a.pc || '',
+  serviceLevel: a.svc || '', sellerClass: a.cls || ''
 }));
 
 // Map alerts from DATA.alerts
@@ -899,7 +901,8 @@ function sellerNarrative(a) {
   var catLabel = {food:'food & beverage',retail:'retail',beauty:'beauty & wellness',services:'services',fitness:'fitness',events:'events',drinks:'drinks & café'}[a.cat] || a.cat;
   var tenureYrs = a.tenure > 0 ? (a.tenure/12).toFixed(1) : '?';
   var locStr = a.locations > 1 ? 'a multi-location ' + catLabel + ' group with ' + a.locations + ' sites' : 'a ' + catLabel + ' business';
-  parts.push(a.name + ' is ' + locStr + ' that\'s been with Square for ' + tenureYrs + ' years.');
+  var geoStr = a.city ? ' based in ' + a.city + (a.state ? ', ' + a.state : '') : '';
+  parts.push(a.name + ' is ' + locStr + geoStr + ' that\'s been with Square for ' + tenureYrs + ' years.');
   
   // Performance & peer context
   var rankStr = a.peerRank >= 75 ? 'in the top ' + (100-a.peerRank) + '% of ' + a.cat + ' sellers by GPV' :
@@ -960,6 +963,55 @@ function sellerMilestones(a) {
   if (a.velocity > 20) milestones.push({icon:'⚡', text:'Fastest growing period — volume up ' + a.velocity.toFixed(0) + '%'});
   if (a.products.filter(function(p){return p && p!=='UNKNOWN' && p!=='Register POS' && p!=='Register Terminal';}).length >= 5) milestones.push({icon:'🌟', text:'Power user — 5+ Square products adopted'});
   return milestones;
+}
+
+
+function findSimilarSellers(a, allAccounts) {
+  var similar = allAccounts.filter(function(s) {
+    return s.name !== a.name && s.cat === a.cat && 
+           s.gpv >= a.gpv * 0.5 && s.gpv <= a.gpv * 2.0;
+  });
+  // Prefer same state
+  similar.sort(function(x,y) {
+    var xSameState = x.state === a.state ? 1 : 0;
+    var ySameState = y.state === a.state ? 1 : 0;
+    if (xSameState !== ySameState) return ySameState - xSameState;
+    return Math.abs(x.gpv - a.gpv) - Math.abs(y.gpv - a.gpv);
+  });
+  return similar.slice(0, 4);
+}
+
+function similarSellersHtml(a) {
+  var similar = findSimilarSellers(a, accounts);
+  if (similar.length === 0) return '';
+  
+  // Find products that similar sellers have but this one doesn't
+  var myProds = new Set(a.products.filter(function(p){return p && p!=='UNKNOWN' && p!=='Register POS' && p!=='Register Terminal';}));
+  var peerProds = {};
+  similar.forEach(function(s) {
+    s.products.filter(function(p){return p && p!=='UNKNOWN' && p!=='Register POS' && p!=='Register Terminal';}).forEach(function(p) {
+      if (!myProds.has(p)) peerProds[p] = (peerProds[p]||0) + 1;
+    });
+  });
+  var topGaps = Object.entries(peerProds).sort(function(a,b){return b[1]-a[1];}).slice(0,3);
+  
+  var rows = similar.map(function(s) {
+    var sProds = s.products.filter(function(p){return p && p!=='UNKNOWN' && p!=='Register POS' && p!=='Register Terminal';});
+    return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);">' +
+      '<span style="flex:1;font-size:10px;color:var(--text);font-weight:600;min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+s.name+'">'+s.name+'</span>' +
+      '<span style="font-size:9px;color:var(--text3);width:60px;">A$'+s.gpv.toFixed(2)+'M</span>' +
+      '<span style="font-size:9px;color:'+(s.velocity>5?'var(--green)':s.velocity<-5?'var(--red)':'var(--text3)')+';width:40px;">'+(s.velocity>0?'+':'')+s.velocity.toFixed(0)+'%</span>' +
+      '<span style="font-size:9px;color:var(--text3);width:50px;">'+(s.city||'')+'</span>' +
+      '<span style="font-size:9px;color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+sProds.slice(0,3).join(', ')+'</span>' +
+    '</div>';
+  }).join('');
+  
+  var gapHtml = topGaps.length ? '<div style="margin-top:6px;font-size:10px;color:var(--yellow);">💡 ' + topGaps.map(function(g){return '<strong>'+g[0]+'</strong> (used by '+g[1]+'/'+similar.length+' peers)';}).join(', ') + ' — products similar sellers use that this one doesn\'t.</div>' : '';
+  
+  return '<div style="background:var(--bg2);border-radius:6px;padding:10px;margin-top:8px;">' +
+    '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;"><i class="fas fa-users" style="color:var(--blue);margin-right:4px;"></i>Similar Sellers (same category, similar GPV)</div>' +
+    rows + gapHtml +
+  '</div>';
 }
 
 function peerBenchmarkHtml(a) {
@@ -1093,6 +1145,8 @@ function toggleDetail(idx) {
       '<div class="detail-tag"><i class="fas fa-phone"></i>'+a.activities30d+' activities (30d)</div>' +
       '<div class="detail-tag"><i class="fas fa-star"></i><span class="stars">'+starsHtml+'</span></div>' +
       '<div class="detail-tag"><i class="fas fa-chart-line"></i>YoY '+(a.yoy>=0?'+':'')+a.yoy+'%</div>' +
+      (a.city ? '<div class="detail-tag"><i class="fas fa-map-marker-alt"></i>'+a.city+(a.state?', '+a.state:'')+(a.postcode?' '+a.postcode:'')+'</div>' : '') +
+      (a.sellerClass ? '<div class="detail-tag"><i class="fas fa-layer-group"></i>'+a.sellerClass+'</div>' : '') +
     '</div>' +
     (function(){
       var ms = sellerMilestones(a);
@@ -1148,6 +1202,7 @@ function toggleDetail(idx) {
         '<div class="product-grid">' + pills + '</div>' +
       '</div>';
     })() +
+    similarSellersHtml(a) +
     '<div class="detail-actions">' +
       '<a class="detail-btn" href="'+sfUrl+'" target="_blank"><i class="fas fa-external-link-alt"></i>View in Salesforce</a>' +
       '<a class="detail-btn secondary" href="#"><i class="fas fa-plus-circle"></i>Log Activity</a>' +
