@@ -577,7 +577,8 @@ const accounts = DATA.accounts.map(a => ({
   lastProcessed: a.lp,
   products: a.products ? a.products.split(',') : [],
   city: a.city || '', state: a.state || '', postcode: a.pc || '',
-  serviceLevel: a.svc || '', sellerClass: a.cls || ''
+  serviceLevel: a.svc || '', sellerClass: a.cls || '',
+  saasAr: a.sar || 0
 }));
 
 // Map alerts from DATA.alerts
@@ -973,54 +974,199 @@ function featureNewsHtml(a) {
 function churnRiskFraming(a) {
   var lines = [];
   
-  // Dollar value of this account
+  // === HELPERS ===
   var gpvDollar = (a.gpv * 1000000);
   var gpvStr = gpvDollar >= 1000000 ? 'A$' + (a.gpv).toFixed(2) + 'M' : 'A$' + (gpvDollar/1000).toFixed(0) + 'K';
-  
-  // Failure of Education risk
   var prods = a.products.filter(function(p){ return p && p !== 'UNKNOWN' && p !== 'Register POS' && p !== 'Register Terminal'; });
-  if (prods.length === 0 && a.tenure >= 24) {
-    lines.push({type:'education', icon:'📚', text:'<strong>Failure of Education risk:</strong> This seller has been on free POS for ' + (a.tenure/12).toFixed(0) + ' years with no product expansion. They may not know what Square can do for them. A discovery call could unlock significant value — for them and for us.'});
-  }
+  var prodCount = prods.length;
+  var saasRatio = a.ar > 0 ? (a.saasAr / a.ar * 100) : 0;
+  var catLabel = {food:'food & beverage',retail:'retail',beauty:'beauty & wellness',services:'services'}[a.cat] || a.cat;
   
-  // Failure of Responsiveness risk
-  if (a.days >= 120 && a.velocity < -5) {
-    lines.push({type:'responsive', icon:'⏰', text:'<strong>Failure of Responsiveness risk:</strong> Last DM ' + a.days + ' days ago and GPV declining (' + a.velocity.toFixed(0) + '%). If they\'re having issues, they may already be looking elsewhere. A proactive call now could prevent churn.'});
-  } else if (a.days >= 150) {
-    lines.push({type:'responsive', icon:'⏰', text:'<strong>Responsiveness gap:</strong> ' + a.days + ' days since last DM. Even if everything is fine, silence can feel like indifference. A quick check-in shows you\'re paying attention.'});
-  }
-  
-  // Comp impact framing — GPV Growth & Retention is 60% of variable comp
-  // Calculate this seller's share of the AM's total portfolio GPV
+  // AM portfolio context
   var amKey = a.am;
   var amPortfolioGpv = 0;
-  accounts.forEach(function(acc){ if (acc.am === amKey) amPortfolioGpv += acc.gpv; });
-  var sellerPctOfPortfolio = amPortfolioGpv > 0 ? (a.gpv / amPortfolioGpv * 100) : 0;
+  var amPortfolioAr = 0;
+  var amAtRiskCount = 0;
+  accounts.forEach(function(acc){
+    if (acc.am === amKey) {
+      amPortfolioGpv += acc.gpv;
+      amPortfolioAr += acc.ar;
+      if (acc.risk === 'at-risk') amAtRiskCount++;
+    }
+  });
+  var sellerPctGpv = amPortfolioGpv > 0 ? (a.gpv / amPortfolioGpv * 100) : 0;
   
-  if (a.risk === 'at-risk' || (a.velocity < -10 && a.gpv > 0.5)) {
-    var gpvImpact = sellerPctOfPortfolio.toFixed(1);
-    var arImpact = 'A$' + (a.ar).toLocaleString('en-AU',{maximumFractionDigits:0});
-    lines.push({type:'value', icon:'💰', text:'<strong>Comp impact:</strong> This seller represents <strong>' + gpvStr + '</strong> in annual GPV — that\'s <strong>' + gpvImpact + '% of your portfolio</strong>. Churning this account would directly reduce your GPV Growth & Retention attainment (60% of variable comp). They also generate <strong>' + arImpact + ' in AR</strong> which flows into your AR Growth metric (40% of comp). Protecting this seller protects your payout.'});
-  } else if (a.gpv > 1.0) {
-    var gpvImpact = sellerPctOfPortfolio.toFixed(1);
-    lines.push({type:'value', icon:'💰', text:'<strong>Portfolio weight:</strong> At <strong>' + gpvStr + '</strong>, this seller is <strong>' + gpvImpact + '% of your total portfolio GPV</strong>. Under the GPV Growth & Retention metric (60% of comp), retaining and growing this account has outsized impact on your attainment. ' + (a.contract ? 'As a contract account, they also contribute to your <strong>Contract Multiplier</strong> (1.1x on contracted GPV).' : 'Getting them onto a contract would unlock the <strong>1.1x Contract Multiplier</strong> on their GPV — worth an additional A$' + ((a.gpv * 0.1) * 1000000 / 1000).toFixed(0) + 'K in attainment credit.')});
+  // Peer retention context — how many similar sellers are declining?
+  var catPeers = accounts.filter(function(s){ return s.cat === a.cat && s.name !== a.name; });
+  var catDeclining = catPeers.filter(function(s){ return s.velocity < -10; }).length;
+  var catDecliningPct = catPeers.length > 0 ? Math.round(catDeclining / catPeers.length * 100) : 0;
+  
+  // ============================================================
+  // 1. CHURN PATTERN DIAGNOSIS — what's actually happening here
+  // ============================================================
+  
+  // Failure of Education — long tenure, no product expansion, seller doesn't know what's possible
+  if (prodCount === 0 && a.tenure >= 24) {
+    var yearsStr = (a.tenure/12).toFixed(0);
+    var educLine = '<strong>Failure of Education:</strong> ' + a.name + ' has been with Square for <strong>' + yearsStr + ' years</strong> using only free POS — no SaaS products, no add-ons.';
+    if (a.gpv > 1.0) {
+      educLine += ' At ' + gpvStr + ' GPV, this is a business that clearly works at scale. They\'re not underperforming — they just haven\'t been shown what else Square can do.';
+    } else {
+      educLine += ' They may genuinely believe Square is "just a card reader." A discovery call reframes the relationship.';
+    }
+    // Specific opener
+    educLine += '<div style="margin-top:4px;padding:4px 8px;background:rgba(0,106,255,0.08);border-radius:4px;font-size:10px;color:var(--blue-light);">💬 <em>"I was looking at your account and realised we\'ve never had a proper conversation about how your business has evolved. I\'d love 15 minutes to understand what\'s changed and whether there are tools you\'re not using that could help."</em></div>';
+    lines.push({type:'education', icon:'📚', text:educLine});
   }
   
-  // Payments-only at-risk segment
-  if (prods.length === 0 && a.gpv > 0.5) {
-    lines.push({type:'segment', icon:'🎯', text:'<strong>At-risk segment:</strong> Payments-only sellers above A$500K are one of the highest-churn cohorts across Square. Product adoption is the strongest retention lever — even one add-on product significantly reduces churn probability.'});
+  // Failure of Responsiveness — declining volume + radio silence = they're solving problems without us
+  if (a.days >= 120 && a.velocity < -5) {
+    var gpvDropStr = 'A$' + Math.abs(Math.round((a.gpv - a.gpv9/0.75*1) * 1000000 / 1000)) + 'K';
+    var respLine = '<strong>Failure of Responsiveness:</strong> GPV is down <strong>' + a.velocity.toFixed(0) + '%</strong> and the last DM was <strong>' + a.days + ' days ago</strong>.';
+    if (a.velocity < -20) {
+      respLine += ' This is a significant decline happening without any AM engagement. If they\'re facing issues — hardware problems, competitor offers, business challenges — they\'re solving them without Square in the room.';
+    } else {
+      respLine += ' The decline is moderate but the silence is the real risk. Sellers who feel ignored during a rough patch are the most likely to leave.';
+    }
+    // Specific opener based on severity
+    if (a.velocity < -20) {
+      respLine += '<div style="margin-top:4px;padding:4px 8px;background:rgba(0,106,255,0.08);border-radius:4px;font-size:10px;color:var(--blue-light);">💬 <em>"I owe you a call — I noticed things have shifted in your business recently and I should have reached out sooner. What\'s been going on? I want to make sure Square is still working for you."</em></div>';
+    } else {
+      respLine += '<div style="margin-top:4px;padding:4px 8px;background:rgba(0,106,255,0.08);border-radius:4px;font-size:10px;color:var(--blue-light);">💬 <em>"Just checking in — I saw your volumes have dipped a bit. Is that seasonal, or has something changed? Happy to jump on a quick call."</em></div>';
+    }
+    lines.push({type:'responsive', icon:'⏰', text:respLine});
+  } else if (a.days >= 150 && a.days < 999) {
+    var respLine = '<strong>Responsiveness gap:</strong> <strong>' + a.days + ' days</strong> since last DM.';
+    if (a.velocity > 5) {
+      respLine += ' Interestingly, they\'re <em>growing</em> (+' + a.velocity.toFixed(0) + '%) — which means they\'re succeeding without hearing from you. That\'s great for now, but it means someone else could step in and take credit for the momentum. A call positions you as the partner who noticed.';
+      respLine += '<div style="margin-top:4px;padding:4px 8px;background:rgba(0,106,255,0.08);border-radius:4px;font-size:10px;color:var(--blue-light);">💬 <em>"I\'ve been watching your numbers and your growth has been impressive — up ' + a.velocity.toFixed(0) + '% recently. I wanted to check in and see if there\'s anything we can do to support that momentum."</em></div>';
+    } else {
+      respLine += ' Even stable sellers need to hear from their AM. Silence reads as indifference — and when a competitor calls, they\'ll be the ones who seem to care.';
+      respLine += '<div style="margin-top:4px;padding:4px 8px;background:rgba(0,106,255,0.08);border-radius:4px;font-size:10px;color:var(--blue-light);">💬 <em>"Hi — it\'s been a while since we connected. I wanted to make sure everything\'s running smoothly and see if there\'s anything on your end I can help with."</em></div>';
+    }
+    lines.push({type:'responsive', icon:'⏰', text:respLine});
   }
   
-  // F&B specific risk
+  // ============================================================
+  // 2. STICKINESS ASSESSMENT — how embedded is this seller?
+  // ============================================================
+  
+  var stickyLine = '';
+  if (prodCount >= 5 && a.contract && a.saasAr > 0) {
+    // Deeply embedded — low churn risk, frame positively
+    stickyLine = '🔒 <strong>High stickiness:</strong> ' + prodCount + ' products, contracted, A$' + (a.saasAr).toLocaleString('en-AU',{maximumFractionDigits:0}) + ' in SaaS AR. This seller is deeply embedded in Square. Churn risk is low — focus on satisfaction and growth, not retention.';
+  } else if (prodCount === 0 && !a.contract && a.saasAr === 0) {
+    // Payments-only, no contract, no SaaS — highest flight risk
+    stickyLine = '⚠️ <strong>Low stickiness:</strong> Payments-only, no contract, zero SaaS revenue. This seller could switch to a competitor with <strong>zero friction</strong> — there\'s nothing tying them to Square beyond habit.';
+    if (a.gpv > 0.5) {
+      stickyLine += ' At ' + gpvStr + ' GPV, that\'s a meaningful loss. The single best retention move is getting them onto <strong>any</strong> SaaS product — even one creates switching cost.';
+    }
+  } else if (prodCount <= 2 && !a.contract) {
+    stickyLine = '🔓 <strong>Moderate stickiness:</strong> ' + (prodCount === 0 ? 'No add-on products' : 'Only ' + prodCount + ' product' + (prodCount > 1 ? 's' : '')) + ' and no contract. Switching cost is low.';
+    if (a.saasAr > 0) {
+      stickyLine += ' They do generate A$' + (a.saasAr).toLocaleString('en-AU',{maximumFractionDigits:0}) + ' in SaaS AR, which helps — but a contract conversation would significantly reduce flight risk.';
+    } else {
+      stickyLine += ' Every product you add creates a reason to stay. Start with the one that solves their biggest daily pain point.';
+    }
+  }
+  
+  if (stickyLine) {
+    lines.push({type:'sticky', icon:'', text:stickyLine});
+  }
+  
+  // ============================================================
+  // 3. WHAT'S AT STAKE — specific, not generic
+  // ============================================================
+  
+  // Only show for meaningful accounts, and frame around the seller's business, not AM comp
+  if (a.risk === 'at-risk' || (a.velocity < -15 && a.gpv > 0.3)) {
+    var stakeLine = '<strong>What\'s at stake:</strong> ';
+    var arStr = 'A$' + (a.ar).toLocaleString('en-AU',{maximumFractionDigits:0});
+    
+    if (sellerPctGpv >= 2.0) {
+      stakeLine += 'This is <strong>' + sellerPctGpv.toFixed(1) + '% of your total portfolio GPV</strong> and ' + arStr + ' in AR. Losing this account would be visible in your numbers.';
+    } else if (a.gpv >= 1.0) {
+      stakeLine += gpvStr + ' in GPV and ' + arStr + ' in AR. A top-quartile account in your book.';
+    } else {
+      stakeLine += gpvStr + ' in GPV. Not your largest account, but ' + arStr + ' in AR adds up — and every churned seller makes the next one easier to lose.';
+    }
+    
+    // Contract multiplier — 1.1x on in-quarter GPV and AR (quota is quarterly)
+    // Per AM Comp SMB Metrics Explainer: multiplier applies to both GPV Growth & Retention (60%) and AR Growth (40%)
+    if (!a.contract && a.gpv > 0.5) {
+      var qtrGpv = a.gpv / 4;
+      var qtrGpvStr = (qtrGpv * 1000000) >= 1000000 ? 'A$' + qtrGpv.toFixed(2) + 'M' : 'A$' + (qtrGpv * 1000).toFixed(0) + 'K';
+      var qtrGpvUplift = Math.round(qtrGpv * 0.1 * 1000000 / 1000);
+      var qtrArUplift = Math.round(a.ar / 4 * 0.1);
+      stakeLine += ' <span style="color:var(--yellow);">Getting them contracted would add the <strong>1.1x multiplier</strong> on their in-quarter GPV (~' + qtrGpvStr + '/qtr → ~A$' + qtrGpvUplift + 'K GPV attainment uplift) and on AR wins (~A$' + qtrArUplift + '/qtr AR uplift). The multiplier applies to both your GPV Growth & Retention and AR Growth metrics.</span>';
+    }
+    
+    lines.push({type:'stake', icon:'📊', text:stakeLine});
+  }
+  
+  // ============================================================
+  // 4. CATEGORY-SPECIFIC RISK SIGNALS — what to actually ask about
+  // ============================================================
+  
   if (a.cat === 'food' && a.velocity < -5 && a.gpv > 0.3) {
-    lines.push({type:'segment', icon:'🍽️', text:'<strong>F&B retention watch:</strong> Food & beverage is the highest-churn category for SMB+. Common drivers: 3P delivery fee pressure, split payment frustrations, printer/hardware reliability. Ask what\'s been frustrating them lately.'});
+    var fbLine = '<strong>F&B-specific signals to probe:</strong> ';
+    if (a.avgTicket && a.avgTicket < 20) {
+      fbLine += 'At A$' + a.avgTicket.toFixed(0) + ' avg ticket, this is likely a café/QSR — check if they\'re losing foot traffic to nearby competitors or if delivery fees are cutting into margins.';
+    } else if (a.avgTicket && a.avgTicket >= 40) {
+      fbLine += 'Premium dining at A$' + a.avgTicket.toFixed(0) + ' avg ticket — declining volume here often means fewer covers, not lower spend. Ask about staffing challenges or reservation no-shows.';
+    } else {
+      fbLine += 'Common F&B churn drivers: 3P delivery fee pressure, split payment frustrations, hardware reliability issues, or a competitor offering lower rates.';
+    }
+    fbLine += '<div style="margin-top:4px;padding:4px 8px;background:rgba(0,106,255,0.08);border-radius:4px;font-size:10px;color:var(--blue-light);">💬 <em>"I know the hospitality space has been tough lately. What\'s been the biggest challenge for your business this quarter?"</em></div>';
+    lines.push({type:'category', icon:'🍽️', text:fbLine});
+  }
+  
+  if (a.cat === 'retail' && a.velocity < -10 && a.gpv > 0.3) {
+    var rtlLine = '<strong>Retail-specific signals:</strong> ';
+    if (!a.products.some(function(p){ return p === 'Square Online Store' || p === 'Square Online Checkout'; })) {
+      rtlLine += 'No online channel — if foot traffic is declining, they have no fallback revenue stream. This is both a risk factor and an opportunity.';
+    } else {
+      rtlLine += 'They have online but in-store is declining. Ask whether online is cannibalising in-store or if it\'s a broader traffic issue.';
+    }
+    lines.push({type:'category', icon:'🛍️', text:rtlLine});
+  }
+  
+  if (a.cat === 'beauty' && a.velocity < -10 && a.gpv > 0.2) {
+    var beautyLine = '<strong>Beauty-specific signals:</strong> ';
+    if (!a.products.some(function(p){ return p === 'Appointments' || p === 'Appointments Plus'; })) {
+      beautyLine += 'No Appointments product — they\'re likely managing bookings manually or through a competitor tool (Fresha, Timely). That competitor tool is the biggest churn risk because it becomes the system of record.';
+    } else {
+      beautyLine += 'They\'re on Appointments, so they\'re embedded. Declining volume likely means fewer clients, not a platform issue. Ask about client retention and marketing.';
+    }
+    lines.push({type:'category', icon:'💅', text:beautyLine});
+  }
+  
+  // ============================================================
+  // 5. PEER CONTEXT — are they an outlier or is the category struggling?
+  // ============================================================
+  
+  if (a.velocity < -10 && catDecliningPct > 0) {
+    var peerLine = '';
+    if (catDecliningPct >= 25) {
+      peerLine = '<strong>Category trend:</strong> ' + catDecliningPct + '% of ' + catLabel + ' sellers in the portfolio are also declining. This may be a market-wide issue (seasonality, economic conditions) rather than a seller-specific problem. Acknowledge the environment before problem-solving.';
+    } else {
+      peerLine = '<strong>Outlier alert:</strong> Only ' + catDecliningPct + '% of ' + catLabel + ' sellers are declining — this seller is bucking the trend. The issue is likely specific to their business. Dig deeper.';
+    }
+    lines.push({type:'peer', icon:'👥', text:peerLine});
   }
   
   if (lines.length === 0) return '';
   
-  return '<div style="background:var(--bg3);border-radius:8px;padding:12px;margin:8px 0;border-left:3px solid var(--red);">' +
-    '<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;"><i class="fas fa-shield-alt" style="color:var(--red);margin-right:4px;"></i>Retention Intelligence</div>' +
-    lines.map(function(l){ return '<div style="padding:5px 0;font-size:11px;color:var(--text);line-height:1.6;">' + l.icon + ' ' + l.text + '</div>'; }).join('') +
+  // Determine border color based on severity
+  var borderColor = 'var(--red)';
+  var headerIcon = 'fa-shield-alt';
+  if (lines.length === 1 && lines[0].type === 'sticky' && prodCount >= 3) {
+    borderColor = 'var(--yellow)';
+  }
+  
+  return '<div style="background:var(--bg3);border-radius:8px;padding:12px;margin:8px 0;border-left:3px solid ' + borderColor + ';">' +
+    '<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;"><i class="fas ' + headerIcon + '" style="color:' + borderColor + ';margin-right:4px;"></i>Retention Intelligence</div>' +
+    lines.map(function(l){ return '<div style="padding:6px 0;font-size:11px;color:var(--text);line-height:1.6;border-bottom:1px solid rgba(30,51,71,0.2);">' + l.icon + (l.icon ? ' ' : '') + l.text + '</div>'; }).join('') +
   '</div>';
 }
 

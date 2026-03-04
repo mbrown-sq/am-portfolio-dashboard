@@ -62,6 +62,7 @@ const DATA = {
 | `pc` | Postcode | Snowflake: VDIM_USER |
 | `svc` | AM Service Level | Snowflake: AM_FACT_ACCOUNT_OWNERSHIP_V2 |
 | `cls` | Seller Class | Snowflake: AM_FACT_ACCOUNT_OWNERSHIP_V2 |
+| `sar` | SaaS AR (annual, dollars) — used for stickiness assessment | Original data |
 
 **Feature News format** (in `data.js` → `DATA.featureNews`):
 ```javascript
@@ -160,11 +161,17 @@ SFDC Account ID → SBS_BOOK_OF_BUSINESS_ID_C → BUSINESS_ID (in AM tables)
 
 ## What Needs Work
 
-### Retention Intelligence Wording (in progress)
+### Retention Intelligence ✅ (rewritten 2026-03-05)
 **File:** `index.html` → search for `function churnRiskFraming(a)`
-**Problem:** The comp-impact framing is too generic. Needs specific, actionable language that motivates AMs without being patronising.
-**Current state:** Shows portfolio % and dollar amounts but the wording needs iteration.
-**Direction:** Frame around seller outcomes and specific actions, not "this protects your payout."
+**Status:** Rewritten from generic comp-framing to 5-section seller-outcome-focused intelligence.
+**New structure:**
+1. **Churn Pattern Diagnosis** — Failure of Education / Failure of Responsiveness (from Orbit research), with specific conversation openers in blue callout boxes
+2. **Stickiness Assessment** — uses product count, contract status, and SaaS AR (`saasAr` field, mapped from `sar` in data.js) to rate High/Moderate/Low switching cost
+3. **What's at Stake** — portfolio weight + AR impact, only for at-risk or significantly declining accounts. Contract multiplier mentioned only when actionable (non-contracted sellers)
+4. **Category-Specific Risk Signals** — F&B (avg ticket-aware: café vs premium dining), Retail (online channel check), Beauty (Appointments as competitor risk)
+5. **Peer Context** — compares this seller's decline against category-wide trends. Flags outliers vs market-wide issues
+**Coverage:** 57% of accounts trigger at least one signal (993/1,729)
+**Key change:** Removed "Protecting this seller protects your payout" framing. Now frames around seller outcomes with exact conversation openers.
 
 ### Future Enrichment Opportunities
 1. **Google Places API** — ratings, reviews, website, social links. Needs a GCP project (request via https://cloud-portal.sqprod.co/requests/new or #blockplat-help)
