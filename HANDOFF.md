@@ -387,6 +387,7 @@ Future: Real-time event-based updates via the GTM Unified Data Layer (see GTM Au
 | Product Adoption pills | In modal build | products field |
 | Salesforce direct links | `squareinc.lightning.force.com/lightning/r/Account/{sf}/view` | sf field |
 | **Goose data agent recipe** | `recipes/seller-signals-agent.yaml` | 25+ Snowflake tables |
+| **Data Agent launcher panel** | `toggleAgentPanel()` / `copyAgentQ()` / `copyRecipeCmd()` — floating FAB button (bottom-right) | Recipe example questions, copy-to-clipboard, data coverage tags, roadmap |
 
 ---
 
@@ -401,7 +402,8 @@ Future: Real-time event-based updates via the GTM Unified Data Layer (see GTM Au
 7. **To refresh Snowflake data:** Run the queries above, process with Python, write to data.js, git push
 8. **CSS variables** are at the top of the file (`:root { --bg: #0f1923; ... }`) — change theme here
 9. **To update the Goose recipe:** Edit `recipes/seller-signals-agent.yaml` — add new tables, query patterns, or advisory actions
-10. **For comp accuracy:** Always reference [go/AMCompHub](https://www.notion.so/square-seller/AM-Comp-SMB-Metrics-Explainer-27f70293beed80bba328ff2c653a614c) — contract multiplier is 1.1x on **in-quarter** GPV and AR (quarterly, not annual)
+10. **To edit the Data Agent panel:** Search for `<!-- DATA AGENT -->` in the HTML or `DATA AGENT PANEL` in the JS. The FAB button is `#agentFab`, the slide-up panel is `#agentPanel`. Example questions are `agent-question-btn` buttons.
+11. **For comp accuracy:** Always reference [go/AMCompHub](https://www.notion.so/square-seller/AM-Comp-SMB-Metrics-Explainer-27f70293beed80bba328ff2c653a614c) — contract multiplier is 1.1x on **in-quarter** GPV and AR (quarterly, not annual)
 
 ---
 
@@ -413,4 +415,6 @@ Future: Real-time event-based updates via the GTM Unified Data Layer (see GTM Au
 | Various | 2026-03-04 | Product adoption enrichment (99% match), location data, peer benchmarking |
 | `ba8592d` | 2026-03-04 | Last commit before Retention Intelligence rewrite |
 | `4eefd66` | 2026-03-05 | **Retention Intelligence rewrite** — 5-section seller-outcome-focused framing, saasAr mapping, comp-accurate contract multiplier |
-| `1e4ad86` | 2026-03-05 | **Goose data agent recipe** — 25+ Snowflake tables, seller signals + AM performance |
+| `1e4ad86` | 2026-03-05 | **Goose data agent recipe** |
+| `088b3d7` | 2026-03-05 | **STRATEGY.md update** — reflects Retention Intelligence rewrite, Data Agent recipe, updated 6-phase roadmap |
+| `6dc5298` | 2026-03-05 | **Data Agent launcher panel** — floating FAB button with example questions, recipe copy, data coverage, roadmap
