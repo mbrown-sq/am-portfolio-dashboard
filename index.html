@@ -321,6 +321,29 @@ svg text { font-family:'Inter',sans-serif; }
 .range-btn:hover { border-color:var(--blue); color:var(--text); }
 .range-btn.active { background:var(--blue-dim); border-color:var(--blue); color:var(--blue-light); }
 
+
+/* VELOCITY */
+.vel-up { color:var(--green); font-weight:700; }
+.vel-down { color:var(--red); font-weight:700; }
+.vel-flat { color:var(--text3); }
+.vel-badge { font-size:9px; padding:1px 6px; border-radius:8px; font-weight:700; display:inline-flex; align-items:center; gap:2px; }
+.vel-badge.accel { background:var(--green-dim); color:var(--green); }
+.vel-badge.decel { background:var(--red-dim); color:var(--red); }
+.vel-badge.stable { background:rgba(94,122,148,0.15); color:var(--text3); }
+
+/* PEER BENCHMARK */
+.peer-bar { display:flex; align-items:center; gap:6px; margin-top:8px; }
+.peer-track { flex:1; height:8px; background:var(--bg); border-radius:4px; position:relative; }
+.peer-marker { position:absolute; top:-2px; width:3px; height:12px; border-radius:1px; }
+.peer-you { background:var(--blue-light); z-index:2; }
+.peer-median { background:var(--text3); z-index:1; }
+.peer-label { font-size:8px; color:var(--text3); white-space:nowrap; }
+
+/* PRODUCT ADOPTION */
+.product-grid { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; }
+.product-pill { font-size:8px; padding:2px 7px; border-radius:10px; font-weight:600; display:inline-flex; align-items:center; gap:3px; }
+.product-pill.active { background:var(--green-dim); color:var(--green); }
+.product-pill.inactive { background:rgba(94,122,148,0.08); color:var(--text3); border:1px dashed rgba(94,122,148,0.2); }
 </style>
   <script type="application/ld+json">
 {
@@ -833,6 +856,64 @@ accounts.forEach(a => {
   a.avgTicket = a.at || 0;
 });
 
+// Compute velocity (g9 vs g) and peer benchmarks
+const catStats = {};
+accounts.forEach(a => {
+  if (!catStats[a.cat]) catStats[a.cat] = [];
+  catStats[a.cat].push(a.gpv);
+});
+Object.keys(catStats).forEach(cat => catStats[cat].sort((a,b) => a - b));
+
+function getPercentile(arr, p) {
+  const idx = Math.floor(arr.length * p);
+  return arr[Math.min(idx, arr.length - 1)];
+}
+
+accounts.forEach(a => {
+  // Velocity: compare 9-month trailing vs annualized
+  a.velocity = a.gpv > 0 ? ((a.gpv9 - a.gpv) / a.gpv * 100) : 0;
+  // Peer stats for this category
+  const peers = catStats[a.cat] || [a.gpv];
+  a.peerMedian = getPercentile(peers, 0.5);
+  a.peerP25 = getPercentile(peers, 0.25);
+  a.peerP75 = getPercentile(peers, 0.75);
+  a.peerMax = peers[peers.length - 1];
+  // Percentile rank
+  const below = peers.filter(v => v < a.gpv).length;
+  a.peerRank = Math.round((below / peers.length) * 100);
+});
+
+function velocityBadge(vel) {
+  if (vel > 5) return '<span class="vel-badge accel"><i class="fas fa-arrow-up" style="font-size:7px;"></i>+' + vel.toFixed(0) + '%</span>';
+  if (vel < -5) return '<span class="vel-badge decel"><i class="fas fa-arrow-down" style="font-size:7px;"></i>' + vel.toFixed(0) + '%</span>';
+  return '<span class="vel-badge stable">~' + vel.toFixed(0) + '%</span>';
+}
+
+function peerBenchmarkHtml(a) {
+  const max = a.peerMax || 1;
+  const youPct = Math.min((a.gpv / max) * 100, 100);
+  const medPct = Math.min((a.peerMedian / max) * 100, 100);
+  const p25Pct = Math.min((a.peerP25 / max) * 100, 100);
+  const p75Pct = Math.min((a.peerP75 / max) * 100, 100);
+  const vsMedian = a.peerMedian > 0 ? ((a.gpv - a.peerMedian) / a.peerMedian * 100) : 0;
+  const vsLabel = vsMedian >= 0 ? '<span style="color:var(--green);">+' + vsMedian.toFixed(0) + '% vs median</span>' : '<span style="color:var(--red);">' + vsMedian.toFixed(0) + '% vs median</span>';
+  return '<div class="peer-bar">' +
+    '<span class="peer-label">P25</span>' +
+    '<div class="peer-track">' +
+      '<div style="position:absolute;left:' + p25Pct + '%;width:' + (p75Pct - p25Pct) + '%;height:100%;background:rgba(94,122,148,0.15);border-radius:4px;"></div>' +
+      '<div class="peer-marker peer-median" style="left:' + medPct + '%;"></div>' +
+      '<div class="peer-marker peer-you" style="left:' + youPct + '%;"></div>' +
+    '</div>' +
+    '<span class="peer-label">P75</span>' +
+  '</div>' +
+  '<div style="font-size:9px;color:var(--text2);margin-top:3px;">' +
+    '<span style="color:var(--blue-light);">●</span> This seller: A$' + a.gpv.toFixed(2) + 'M &bull; ' +
+    '<span style="color:var(--text3);">●</span> ' + a.cat + ' median: A$' + a.peerMedian.toFixed(2) + 'M &bull; ' +
+    vsLabel + ' &bull; Top ' + (100 - a.peerRank) + '% of ' + a.cat +
+  '</div>';
+}
+
+
 function makeSparkline(pts, w, h, positive) {
   const min = Math.min(...pts), max = Math.max(...pts);
   const range = max - min || 1;
@@ -885,7 +966,7 @@ renderTable = function() {
       '<td style="font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;" title="'+a.name+'">'+a.name+'</td>' +
       '<td><span class="cat-icon cat-'+a.cat+'"><i class="fas '+catIcons[a.cat]+'"></i></span></td>' +
       '<td><span class="gpv-badge '+tierClass+'">'+tierLabel+'</span></td>' +
-      '<td>'+sparkHtml+'</td>' +
+      '<td>'+sparkHtml+' '+velocityBadge(a.velocity)+'</td>' +
       '<td style="font-weight:700;">$'+a.gpv.toFixed(1)+'M</td>' +
       '<td class="'+(a.yoy>=0?'yoy-pos':'yoy-neg')+'" style="font-weight:600;">'+(a.yoy>=0?'+':'')+a.yoy+'%</td>' +
       '<td style="font-size:10px;color:'+(a.days>60?'var(--red)':a.days>30?'var(--yellow)':'var(--text2)')+';font-weight:'+(a.days>60?'700':'400')+';">'+(a.lastProcessed||'—')+'</td>' +
@@ -939,6 +1020,38 @@ function toggleDetail(idx) {
       '<div class="detail-tag"><i class="fas fa-phone"></i>'+a.activities30d+' activities (30d)</div>' +
       '<div class="detail-tag"><i class="fas fa-star"></i><span class="stars">'+starsHtml+'</span></div>' +
       '<div class="detail-tag"><i class="fas fa-chart-line"></i>YoY '+(a.yoy>=0?'+':'')+a.yoy+'%</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap;">' +
+      '<div style="flex:1;min-width:200px;background:var(--bg2);border-radius:6px;padding:10px;">' +
+        '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">GPV Velocity (9mo vs Annual)</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;">' +
+          velocityBadge(a.velocity) +
+          '<span style="font-size:10px;color:var(--text2);">9mo: A$'+(a.gpv9||0).toFixed(2)+'M vs Ann: A$'+a.gpv.toFixed(2)+'M</span>' +
+        '</div>' +
+        '<div style="font-size:9px;color:var(--text3);margin-top:4px;">' +
+          (a.velocity > 10 ? 'Accelerating — seller is growing faster recently' :
+           a.velocity < -10 ? 'Decelerating — recent volume dropping, investigate' :
+           a.velocity < -50 ? 'Severe decline — possible provider switch or closure' :
+           'Stable trajectory') +
+        '</div>' +
+      '</div>' +
+      '<div style="flex:1;min-width:200px;background:var(--bg2);border-radius:6px;padding:10px;">' +
+        '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">Peer Benchmark ('+a.cat+')</div>' +
+        peerBenchmarkHtml(a) +
+      '</div>' +
+    '</div>' +
+    '<div style="background:var(--bg2);border-radius:6px;padding:10px;margin-top:8px;">' +
+      '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">Product Adoption <span style="color:var(--text3);text-transform:none;letter-spacing:0;">(placeholder — Snowflake integration pending)</span></div>' +
+      '<div class="product-grid">' +
+        '<span class="product-pill active"><i class="fas fa-cash-register"></i>POS</span>' +
+        '<span class="product-pill '+(a.contract?'active':'inactive')+'"><i class="fas fa-file-contract"></i>Contract</span>' +
+        '<span class="product-pill inactive"><i class="fas fa-globe"></i>Online</span>' +
+        '<span class="product-pill inactive"><i class="fas fa-file-invoice-dollar"></i>Invoices</span>' +
+        '<span class="product-pill inactive"><i class="fas fa-calendar-check"></i>Appointments</span>' +
+        '<span class="product-pill inactive"><i class="fas fa-heart"></i>Loyalty</span>' +
+        '<span class="product-pill inactive"><i class="fas fa-bullhorn"></i>Marketing</span>' +
+        '<span class="product-pill inactive"><i class="fas fa-money-check-alt"></i>Payroll</span>' +
+      '</div>' +
     '</div>' +
     '<div class="detail-actions">' +
       '<a class="detail-btn" href="'+sfUrl+'" target="_blank"><i class="fas fa-external-link-alt"></i>View in Salesforce</a>' +
