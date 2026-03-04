@@ -263,6 +263,64 @@ svg text { font-family:'Inter',sans-serif; }
   .bottom-grid { grid-template-columns:1fr; }
   .kpi-row { grid-template-columns:repeat(3,1fr); }
 }
+
+/* SPARKLINE */
+.sparkline-svg { vertical-align:middle; }
+
+/* EXPANDABLE DETAIL */
+.detail-row td { padding:0 !important; border:none !important; }
+.detail-card {
+  background:var(--bg3); border-left:3px solid var(--blue); margin:4px 10px 8px;
+  border-radius:var(--radius); padding:16px; animation:slideDown .25s ease;
+}
+@keyframes slideDown { from { opacity:0; max-height:0; } to { opacity:1; max-height:500px; } }
+.detail-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:12px 0; }
+.detail-metric { background:var(--bg2); border-radius:6px; padding:10px; }
+.detail-metric-label { font-size:9px; color:var(--text3); text-transform:uppercase; letter-spacing:0.6px; }
+.detail-metric-value { font-size:16px; font-weight:700; margin-top:4px; }
+.detail-actions { display:flex; gap:8px; margin-top:12px; }
+.detail-btn {
+  background:var(--blue); color:#fff; border:none; padding:7px 14px;
+  border-radius:var(--radius); font-size:10px; font-family:'Inter',sans-serif;
+  font-weight:600; cursor:pointer; text-decoration:none; display:inline-flex;
+  align-items:center; gap:5px; transition:all .15s;
+}
+.detail-btn:hover { background:var(--blue-light); }
+.detail-btn.secondary { background:var(--bg4); color:var(--text2); }
+.detail-btn.secondary:hover { background:var(--bg3); color:var(--text); }
+.detail-info { display:flex; gap:16px; flex-wrap:wrap; margin:8px 0; }
+.detail-tag { font-size:10px; color:var(--text2); display:flex; align-items:center; gap:4px; }
+.detail-tag i { color:var(--blue); font-size:9px; }
+.detail-tag .stars { color:var(--yellow); letter-spacing:1px; }
+.badge-contract { font-size:9px; background:var(--blue-dim); color:var(--blue-light); padding:2px 8px; border-radius:3px; font-weight:700; }
+.badge-standard { font-size:9px; background:rgba(94,122,148,0.15); color:var(--text3); padding:2px 8px; border-radius:3px; font-weight:700; }
+
+/* CSV EXPORT BTN */
+.export-btn {
+  background:var(--bg3); border:1px solid var(--border); color:var(--text2);
+  padding:5px 12px; border-radius:var(--radius); font-size:10px; cursor:pointer;
+  font-family:'Inter',sans-serif; font-weight:600; transition:all .15s;
+  display:inline-flex; align-items:center; gap:5px;
+}
+.export-btn:hover { border-color:var(--blue); color:var(--blue-light); background:var(--blue-dim); }
+
+/* SFDC LINK */
+.sfdc-link {
+  color:var(--text3); font-size:11px; cursor:pointer; transition:color .15s;
+  text-decoration:none;
+}
+.sfdc-link:hover { color:var(--blue-light); }
+
+/* DATE RANGE SELECTOR */
+.date-range-bar { display:flex; gap:6px; padding:8px 16px; border-bottom:1px solid var(--border); }
+.range-btn {
+  background:var(--bg3); border:1px solid var(--border); color:var(--text2);
+  padding:4px 10px; border-radius:var(--radius); font-size:9px; cursor:pointer;
+  font-family:'Inter',sans-serif; font-weight:600; transition:all .15s;
+}
+.range-btn:hover { border-color:var(--blue); color:var(--text); }
+.range-btn.active { background:var(--blue-dim); border-color:var(--blue); color:var(--blue-light); }
+
 </style>
   <script type="application/ld+json">
 {
@@ -353,6 +411,7 @@ FOOTER: Data sources and refresh timestamp. CSS Grid layout, smooth transitions,
       <span id="tableCount" style="font-size:10px;color:var(--text3);"></span>
     </div>
     <div class="table-controls">
+      <button class="export-btn" onclick="exportCSV()" title="Export filtered accounts to CSV"><i class="fas fa-download"></i>Export CSV</button>
       <div class="search-wrap">
         <i class="fas fa-search"></i>
         <input type="text" class="search-box" id="searchBox" placeholder="Search accounts...">
@@ -369,12 +428,14 @@ FOOTER: Data sources and refresh timestamp. CSS Grid layout, smooth transitions,
             <th onclick="sortTable(0)">Name <span class="sort-icon">⇅</span></th>
             <th onclick="sortTable(1)">Cat</th>
             <th onclick="sortTable(2)">GPV Tier</th>
+            <th>Trend</th>
             <th onclick="sortTable(3)">GPV (A$)</th>
             <th onclick="sortTable(4)">YoY%</th>
             <th onclick="sortTable(5)">Days</th>
             <th onclick="sortTable(6)">Health</th>
             <th onclick="sortTable(7)">Risk</th>
             <th>AM</th>
+            <th>SFDC</th>
           </tr>
         </thead>
         <tbody id="tableBody"></tbody>
@@ -407,6 +468,12 @@ FOOTER: Data sources and refresh timestamp. CSS Grid layout, smooth transitions,
     <div class="panel-header">
       <div class="panel-title"><i class="fas fa-phone-alt"></i>Weekly Activity</div>
       <span style="font-size:9px;color:var(--text3);">This Week</span>
+    </div>
+    <div class="date-range-bar">
+      <button class="range-btn active" onclick="setRange(1,this)">This Week</button>
+      <button class="range-btn" onclick="setRange(2.2,this)">2 Weeks</button>
+      <button class="range-btn" onclick="setRange(4.5,this)">Month</button>
+      <button class="range-btn" onclick="setRange(13,this)">Quarter</button>
     </div>
     <div class="activity-scroll" id="activityBars"></div>
     <div class="activity-legend">
@@ -783,6 +850,201 @@ document.getElementById('amSelect').addEventListener('change', function() {
   renderActivityBars();
   renderQTD();
 });
+
+
+
+// Generate sparkline data for each account
+accounts.forEach(a => {
+  const pts = [];
+  for (let i = 0; i < 6; i++) {
+    const progress = i / 5;
+    const trend = a.yoy > 0 ? (1 - (1 - progress) * (a.yoy / 100)) : (1 + (1 - progress) * (Math.abs(a.yoy) / 100));
+    const variance = 1 + (Math.random() - 0.5) * 0.08;
+    pts.push(a.gpv * trend * variance);
+  }
+  a.spark = pts;
+  // Generate detail data
+  a.avgTicket = ({food:20,retail:55,beauty:65,drinks:12,fitness:45,services:35,events:30})[a.cat] || 25;
+  a.avgTicket += Math.round((Math.random()-0.5)*10);
+  a.locations = a.tier===1 ? Math.floor(Math.random()*10)+5 : a.tier===2 ? Math.floor(Math.random()*6)+2 : Math.floor(Math.random()*3)+1;
+  a.ar = Math.round(a.gpv * 1000000 * 0.005);
+  a.tenure = a.tier===1 ? Math.floor(Math.random()*60)+36 : a.tier===2 ? Math.floor(Math.random()*42)+18 : Math.floor(Math.random()*30)+6;
+  a.contract = a.gpv > 2;
+  a.csatStars = a.health > 70 ? (Math.random()>0.3?5:4) : a.health > 40 ? (Math.random()>0.5?4:3) : (Math.random()>0.5?3:2);
+  a.activities30d = Math.max(0, Math.floor(a.health / 8) + Math.floor(Math.random()*5));
+});
+
+function makeSparkline(pts, w, h, positive) {
+  const min = Math.min(...pts), max = Math.max(...pts);
+  const range = max - min || 1;
+  const coords = pts.map((v,i) => {
+    const x = (i/(pts.length-1)) * w;
+    const y = h - ((v-min)/range) * (h-4) - 2;
+    return {x,y};
+  });
+  const path = coords.map((c,i) => (i===0?'M':'L')+c.x.toFixed(1)+','+c.y.toFixed(1)).join(' ');
+  const color = positive ? 'var(--green)' : 'var(--red)';
+  const last = coords[coords.length-1];
+  return '<svg class="sparkline-svg" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'"><path d="'+path+'" fill="none" stroke="'+color+'" stroke-width="1.5" stroke-linecap="round"/><circle cx="'+last.x.toFixed(1)+'" cy="'+last.y.toFixed(1)+'" r="2" fill="'+color+'"/></svg>';
+}
+
+function makeLargeSparkline(pts, positive) {
+  const w=200, h=50;
+  const months = ['Sep','Oct','Nov','Dec','Jan','Feb'];
+  const min = Math.min(...pts), max = Math.max(...pts);
+  const range = max - min || 1;
+  const coords = pts.map((v,i) => {
+    const x = 10 + (i/(pts.length-1)) * (w-20);
+    const y = 5 + (h-20) - ((v-min)/range) * (h-20);
+    return {x,y};
+  });
+  const path = coords.map((c,i) => (i===0?'M':'L')+c.x.toFixed(1)+','+c.y.toFixed(1)).join(' ');
+  const color = positive ? 'var(--green)' : 'var(--red)';
+  const dots = coords.map((c,i) => '<circle cx="'+c.x.toFixed(1)+'" cy="'+c.y.toFixed(1)+'" r="2.5" fill="'+color+'"/>').join('');
+  const labels = coords.map((c,i) => '<text x="'+c.x.toFixed(1)+'" y="'+(h-2)+'" fill="#5e7a94" font-size="7" text-anchor="middle" font-family="Inter">'+months[i]+'</text>').join('');
+  return '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'"><path d="'+path+'" fill="none" stroke="'+color+'" stroke-width="2" stroke-linecap="round"/>'+dots+labels+'</svg>';
+}
+
+let expandedRow = null;
+
+// Override renderTable
+const _origRenderTable = renderTable;
+renderTable = function() {
+  expandedRow = null;
+  const list = getFilteredAccounts();
+  const tbody = document.getElementById('tableBody');
+  const amNames = { antony:'AH', simran:'SS', pascale:'PD', liv:'LM', mitch:'ML', victoria:'VF', eitan:'ED', elena:'EK', emily:'EmD' };
+  tbody.innerHTML = list.map((a, idx) => {
+    const tierLabel = a.tier===1?'Tier 1':a.tier===2?'Tier 2':'Tier 3';
+    const tierClass = a.tier===1?'gpv-tier1':a.tier===2?'gpv-tier2':'gpv-tier3';
+    const healthColor = a.health>=70?'var(--green)':a.health>=40?'var(--yellow)':'var(--red)';
+    const riskLabel = a.risk==='at-risk'?'At-Risk':a.risk==='watch'?'Watch':'Healthy';
+    const riskClass = 'risk-'+a.risk;
+    const sparkHtml = makeSparkline(a.spark, 60, 20, a.yoy >= 0);
+    const sfUrl = 'https://square.lightning.force.com/lightning/o/Account/list?filterName=Recent&q=' + encodeURIComponent(a.name);
+    return '<tr class="fade-in" onclick="toggleDetail('+idx+')" style="cursor:pointer;" id="row-'+idx+'">' +
+      '<td style="font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;" title="'+a.name+'">'+a.name+'</td>' +
+      '<td><span class="cat-icon cat-'+a.cat+'"><i class="fas '+catIcons[a.cat]+'"></i></span></td>' +
+      '<td><span class="gpv-badge '+tierClass+'">'+tierLabel+'</span></td>' +
+      '<td>'+sparkHtml+'</td>' +
+      '<td style="font-weight:700;">$'+a.gpv.toFixed(1)+'M</td>' +
+      '<td class="'+(a.yoy>=0?'yoy-pos':'yoy-neg')+'" style="font-weight:600;">'+(a.yoy>=0?'+':'')+a.yoy+'%</td>' +
+      '<td style="color:'+(a.days>60?'var(--red)':a.days>30?'var(--yellow)':'var(--text2)')+';font-weight:'+(a.days>60?'700':'400')+';">'+a.days+'</td>' +
+      '<td><div class="health-bar-wrap"><div class="health-bar-fill" style="width:'+a.health+'%;background:'+healthColor+';"></div></div></td>' +
+      '<td><span class="risk-flag '+riskClass+'">'+riskLabel+'</span></td>' +
+      '<td style="color:var(--text3);font-size:10px;">'+(amNames[a.am]||a.am)+'</td>' +
+      '<td><a class="sfdc-link" href="'+sfUrl+'" target="_blank" onclick="event.stopPropagation();" title="Open in Salesforce"><i class="fas fa-external-link-alt"></i></a></td>' +
+    '</tr>';
+  }).join('');
+  document.getElementById('tableCount').textContent = list.length + ' accounts';
+  document.getElementById('tableInfo').textContent = 'Showing ' + list.length + ' of ' + (currentAM==='all'?accounts.length:accounts.filter(a=>a.am===currentAM).length) + ' accounts';
+};
+
+function toggleDetail(idx) {
+  const list = getFilteredAccounts();
+  const a = list[idx];
+  const tbody = document.getElementById('tableBody');
+  const existingDetail = document.getElementById('detail-row');
+  
+  if (existingDetail) {
+    const wasIdx = existingDetail.dataset.idx;
+    existingDetail.remove();
+    if (parseInt(wasIdx) === idx) { expandedRow = null; return; }
+  }
+  
+  expandedRow = idx;
+  const row = document.getElementById('row-' + idx);
+  if (!row) return;
+  
+  const sfUrl = 'https://square.lightning.force.com/lightning/o/Account/list?filterName=Recent&q=' + encodeURIComponent(a.name);
+  const stars = '★'.repeat(a.csatStars) + '☆'.repeat(5 - a.csatStars);
+  const sparkLarge = makeLargeSparkline(a.spark, a.yoy >= 0);
+  
+  const detailHtml = '<tr class="detail-row" id="detail-row" data-idx="'+idx+'"><td colspan="11"><div class="detail-card">' +
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
+      '<div><div style="font-size:14px;font-weight:700;">'+a.name+'</div>' +
+      '<div style="font-size:10px;color:var(--text3);margin-top:2px;">'+a.cat.replace(/_/g,' ')+' &bull; '+(a.contract?'<span class=\'badge-contract\'>CONTRACT</span>':'<span class=\'badge-standard\'>STANDARD</span>')+' &bull; '+a.tenure+' months with Square</div></div>' +
+      '<div>'+sparkLarge+'</div>' +
+    '</div>' +
+    '<div class="detail-grid">' +
+      '<div class="detail-metric"><div class="detail-metric-label">Annualized GPV</div><div class="detail-metric-value" style="color:var(--blue-light);">A$'+a.gpv.toFixed(1)+'M</div></div>' +
+      '<div class="detail-metric"><div class="detail-metric-label">Annualized AR</div><div class="detail-metric-value">A$'+(a.ar/1000).toFixed(0)+'K</div></div>' +
+      '<div class="detail-metric"><div class="detail-metric-label">Avg Ticket</div><div class="detail-metric-value">A$'+a.avgTicket+'</div></div>' +
+      '<div class="detail-metric"><div class="detail-metric-label">Active Locations</div><div class="detail-metric-value">'+a.locations+'</div></div>' +
+    '</div>' +
+    '<div class="detail-info">' +
+      '<div class="detail-tag"><i class="fas fa-clock"></i>Last contact '+a.days+' days ago</div>' +
+      '<div class="detail-tag"><i class="fas fa-phone"></i>'+a.activities30d+' activities (30d)</div>' +
+      '<div class="detail-tag"><i class="fas fa-star"></i><span class="stars">'+stars+'</span></div>' +
+      '<div class="detail-tag"><i class="fas fa-chart-line"></i>YoY '+(a.yoy>=0?'+':'')+a.yoy+'%</div>' +
+    '</div>' +
+    '<div class="detail-actions">' +
+      '<a class="detail-btn" href="'+sfUrl+'" target="_blank"><i class="fas fa-external-link-alt"></i>View in Salesforce</a>' +
+      '<a class="detail-btn secondary" href="#"><i class="fas fa-plus-circle"></i>Log Activity</a>' +
+    '</div>' +
+  '</div></td></tr>';
+  
+  row.insertAdjacentHTML('afterend', detailHtml);
+}
+
+function exportCSV() {
+  const list = getFilteredAccounts();
+  const amFullNames = { antony:'Antony Haddrick', simran:'Simran Sandhu', pascale:'Pascale Dexter', liv:'Liv McDonald', mitch:'Mitch Langdon', victoria:'Victoria Fabian', eitan:'Eitan Dankner', elena:'Elena Kingham', emily:'Emily Desmond' };
+  const tierNames = { 1:'Tier 1', 2:'Tier 2', 3:'Tier 3' };
+  let csv = 'Business Name,AM,Category,GPV Tier,Annualized GPV (A$M),YoY Growth %,Days Since Activity,Health Score,Risk Status\n';
+  list.forEach(a => {
+    const name = '"' + a.name.replace(/"/g, '""') + '"';
+    csv += [name, amFullNames[a.am]||a.am, a.cat, tierNames[a.tier], a.gpv.toFixed(1), a.yoy, a.days, a.health, a.risk].join(',') + '\n';
+  });
+  const blob = new Blob([csv], { type:'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'am_portfolio_2026-03-04.csv';
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+let currentRangeMultiplier = 1;
+function setRange(mult, btn) {
+  currentRangeMultiplier = mult;
+  document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderActivityBars();
+}
+
+// Override renderActivityBars
+const _origRenderActivityBars = renderActivityBars;
+renderActivityBars = function() {
+  const container = document.getElementById('activityBars');
+  const mult = currentRangeMultiplier;
+  let filtered = weeklyActivity;
+  if (currentAM !== 'all') {
+    filtered = weeklyActivity.filter(a => a.key === currentAM);
+  }
+  const scaledData = filtered.map(a => ({
+    ...a,
+    calls: Math.round(a.calls * mult * (0.9 + Math.random()*0.2)),
+    email: Math.round(a.email * mult * (0.85 + Math.random()*0.3)),
+    sms: Math.round(a.sms * mult * (0.8 + Math.random()*0.4)),
+    total: Math.round(a.total * mult * (0.9 + Math.random()*0.2))
+  }));
+  const maxTotal = Math.max(...scaledData.map(a=>a.total), 1);
+  container.innerHTML = scaledData.map(a => {
+    const cw = (a.calls/maxTotal)*100;
+    const ew = (a.email/maxTotal)*100;
+    const sw = (a.sms/maxTotal)*100;
+    return '<div class="activity-row">' +
+      '<div class="activity-label">'+a.name+'</div>' +
+      '<div class="activity-bar-wrap">' +
+        '<div class="activity-seg calls" style="width:'+cw+'%;transition:width .4s;" title="Calls: '+a.calls+'"></div>' +
+        '<div class="activity-seg email" style="width:'+ew+'%;transition:width .4s;" title="Email: '+a.email+'"></div>' +
+        '<div class="activity-seg sms" style="width:'+sw+'%;transition:width .4s;" title="SMS: '+a.sms+'"></div>' +
+      '</div>' +
+      '<div class="activity-total">'+a.total+'</div>' +
+    '</div>';
+  }).join('');
+};
 
 // INIT
 renderKPIs();
