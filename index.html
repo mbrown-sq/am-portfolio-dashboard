@@ -136,6 +136,7 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
 
 .data-table { width:100%; border-collapse:collapse; }
 .data-table thead th {
+  position:sticky; top:0; z-index:10; background:var(--bg2);
   font-size:9px; text-transform:uppercase; letter-spacing:0.8px; color:var(--text3);
   padding:8px 10px; text-align:left; border-bottom:1px solid var(--border);
   cursor:pointer; user-select:none; white-space:nowrap; font-weight:600;
@@ -970,7 +971,7 @@ renderTable = function() {
       '<td>'+sparkHtml+' '+velocityBadge(a.velocity)+'</td>' +
       '<td style="font-weight:700;">$'+a.gpv.toFixed(1)+'M</td>' +
       '<td class="'+(a.yoy>=0?'yoy-pos':'yoy-neg')+'" style="font-weight:600;">'+(a.yoy>=0?'+':'')+a.yoy+'%</td>' +
-      '<td style="font-size:10px;color:'+(a.days>60?'var(--red)':a.days>30?'var(--yellow)':'var(--text2)')+';font-weight:'+(a.days>60?'700':'400')+';">'+(a.lastProcessed||'—')+'</td>' +
+      '<td style="font-size:10px;color:'+(a.days>=180?'var(--red)':a.days>=90?'var(--yellow)':a.days>=30?'var(--text2)':'var(--green)')+';font-weight:'+(a.days>=180?'700':'400')+';" title="'+(a.days>=180?'⚠ Past 6mo — at risk of release to eligible pool':a.days>=90?'Approaching 6mo DM window':'')+'">'+(a.lastProcessed||'—')+'</td>' +
       '<td><div class="health-bar-wrap"><div class="health-bar-fill" style="width:'+a.health+'%;background:'+healthColor+';"></div></div></td>' +
       '<td><span class="risk-flag '+riskClass+'">'+riskLabel+'</span></td>' +
       '<td>'+(a.contract?'<span class="badge-contract" style="font-size:8px;">CONTRACT</span>':'<span style="font-size:8px;color:var(--text3);">Std</span>')+'</td>' +
