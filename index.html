@@ -893,6 +893,29 @@ function getFilteredAccounts() {
   return list;
 }
 
+function riskReason(a) {
+  var parts = [];
+  // GPV trend
+  if (a.yoy <= -15) parts.push('GPV declining ' + a.yoy + '%');
+  else if (a.yoy < -5) parts.push('GPV down ' + a.yoy + '%');
+  else if (a.yoy < 5) parts.push('Flat GPV (' + (a.yoy >= 0 ? '+' : '') + a.yoy + '%)');
+  else parts.push('GPV growing +' + a.yoy + '%');
+  // Contact recency
+  if (a.days >= 180) parts.push('no contact in ' + a.days + ' days');
+  else if (a.days >= 90) parts.push(a.days + ' days since contact');
+  else if (a.days >= 30) parts.push('contacted ' + a.days + ' days ago');
+  else parts.push('contacted ' + a.days + 'd ago');
+  // Products
+  var pCount = a.products ? a.products.length : 0;
+  if (pCount <= 1) parts.push('only ' + pCount + ' product');
+  else if (pCount <= 2) parts.push(pCount + ' products');
+  else parts.push(pCount + ' products adopted');
+  // Contract
+  if (a.contract) parts.push('contracted');
+  else parts.push('no contract');
+  return parts.join(', ');
+}
+
 function renderTable() {
   const list = getFilteredAccounts();
   const tbody = document.getElementById('tableBody');
@@ -911,7 +934,7 @@ function renderTable() {
       <td class="${a.yoy>=0?'yoy-pos':'yoy-neg'}" style="font-weight:600;">${a.yoy>=0?'+':''}${a.yoy}%</td>
       <td style="color:${a.days>60?'var(--red)':a.days>30?'var(--yellow)':'var(--text2)'};font-weight:${a.days>60?'700':'400'};">${a.days}</td>
       <td><div class="health-bar-wrap"><div class="health-bar-fill" style="width:${a.health}%;background:${healthColor};"></div></div></td>
-      <td><span class="risk-flag ${riskClass}">${riskLabel}</span></td>
+      <td><span class="risk-flag ${riskClass}" title="${riskReason(a)}">${riskLabel}</span></td>
       <td style="color:var(--text3);font-size:10px;">${amNames[a.am]||a.am}</td>
     </tr>`;
   }).join('');
@@ -1801,7 +1824,7 @@ renderTable = function() {
       '<td class="'+(a.yoy>=0?'yoy-pos':'yoy-neg')+'" style="font-weight:600;">'+(a.yoy>=0?'+':'')+a.yoy+'%</td>' +
       '<td style="font-size:10px;color:'+(a.days>=180?'var(--red)':a.days>=90?'var(--yellow)':a.days>=30?'var(--text2)':'var(--green)')+';font-weight:'+(a.days>=180?'700':'400')+';" title="'+(a.days>=180?'⚠ Past 6mo — at risk of release to eligible pool':a.days>=90?'Approaching 6mo DM window':'')+'">'+(a.lastProcessed||'—')+'</td>' +
       '<td><div class="health-bar-wrap"><div class="health-bar-fill" style="width:'+a.health+'%;background:'+healthColor+';"></div></div></td>' +
-      '<td><span class="risk-flag '+riskClass+'">'+riskLabel+'</span></td>' +
+      '<td><span class="risk-flag '+riskClass+'" title="'+riskReason(a)+'">'+riskLabel+'</span></td>' +
       '<td>'+(a.contract?'<span class="badge-contract" style="font-size:8px;">CONTRACT</span>':'<span style="font-size:8px;color:var(--text3);">Std</span>')+'</td>' +
       '<td style="color:var(--text3);font-size:10px;">'+(amNames[a.am]||a.am)+'</td>' +
       '<td><a class="sfdc-link" href="'+sfUrl+'" target="_blank" onclick="event.stopPropagation();" title="Open in Salesforce"><i class="fas fa-external-link-alt"></i></a></td>' +
