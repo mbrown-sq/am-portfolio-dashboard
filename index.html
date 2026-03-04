@@ -246,6 +246,100 @@ svg text { font-family:'Inter',sans-serif; }
 .qtd-bar-wrap { flex:1; height:4px; background:var(--bg); border-radius:2px; margin:0 10px; max-width:80px; }
 .qtd-bar-fill { height:100%; border-radius:2px; background:var(--blue); }
 
+
+/* DATA AGENT LAUNCHER */
+.agent-fab {
+  position:fixed; bottom:24px; right:24px; z-index:900;
+  width:52px; height:52px; border-radius:50%; border:none;
+  background:linear-gradient(135deg, #006AFF, #338bff); color:#fff;
+  font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  box-shadow:0 4px 20px rgba(0,106,255,0.4); transition:all .25s;
+}
+.agent-fab:hover { transform:scale(1.1); box-shadow:0 6px 28px rgba(0,106,255,0.55); }
+.agent-fab.open { transform:rotate(45deg) scale(1.1); background:var(--red); box-shadow:0 4px 20px rgba(255,61,87,0.4); }
+.agent-fab.open:hover { box-shadow:0 6px 28px rgba(255,61,87,0.55); }
+
+.agent-panel {
+  position:fixed; bottom:88px; right:24px; z-index:899;
+  width:380px; max-height:520px; border-radius:var(--radius);
+  background:var(--bg2); border:1px solid var(--border);
+  box-shadow:0 12px 48px rgba(0,0,0,0.5);
+  display:none; flex-direction:column; overflow:hidden;
+  animation:agentSlideUp .25s ease;
+}
+.agent-panel.visible { display:flex; }
+@keyframes agentSlideUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+
+.agent-panel-header {
+  padding:14px 16px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+}
+.agent-panel-title { font-size:13px; font-weight:700; color:var(--text); }
+.agent-panel-title i { color:var(--blue); margin-right:8px; }
+.agent-panel-badge {
+  font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px;
+  background:var(--green-dim); color:var(--green); padding:3px 8px; border-radius:10px;
+}
+
+.agent-panel-body { padding:16px; overflow-y:auto; flex:1; }
+
+.agent-section-label {
+  font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px;
+  color:var(--text3); margin-bottom:8px; margin-top:14px;
+}
+.agent-section-label:first-child { margin-top:0; }
+
+.agent-desc {
+  font-size:11px; color:var(--text2); line-height:1.6; margin-bottom:12px;
+}
+
+.agent-question-btn {
+  display:block; width:100%; text-align:left; padding:9px 12px;
+  background:var(--bg); border:1px solid var(--border); border-radius:6px;
+  color:var(--text2); font-size:11px; font-family:"Inter",sans-serif;
+  cursor:pointer; transition:all .15s; margin-bottom:6px; line-height:1.4;
+}
+.agent-question-btn:hover { border-color:var(--blue); color:var(--text); background:var(--blue-dim); }
+.agent-question-btn i { color:var(--blue); margin-right:6px; font-size:9px; }
+
+.agent-copy-block {
+  background:var(--bg); border:1px solid var(--border); border-radius:6px;
+  padding:10px 12px; margin-top:6px; position:relative;
+}
+.agent-copy-code {
+  font-family:"SF Mono","Fira Code",monospace; font-size:10px; color:var(--blue-light);
+  word-break:break-all; line-height:1.5; display:block; padding-right:28px;
+}
+.agent-copy-btn {
+  position:absolute; top:8px; right:8px; background:none; border:1px solid var(--border);
+  color:var(--text3); width:24px; height:24px; border-radius:4px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; font-size:10px; transition:all .15s;
+}
+.agent-copy-btn:hover { border-color:var(--blue); color:var(--blue); }
+.agent-copy-btn.copied { border-color:var(--green); color:var(--green); }
+
+.agent-table-grid {
+  display:grid; grid-template-columns:1fr 1fr; gap:4px; margin-bottom:4px;
+}
+.agent-table-tag {
+  font-size:9px; color:var(--text3); background:var(--bg); border-radius:3px;
+  padding:3px 6px; text-align:center; border:1px solid transparent;
+  transition:all .15s;
+}
+.agent-table-tag:hover { border-color:var(--border); color:var(--text2); }
+
+.agent-phase-row {
+  display:flex; align-items:center; gap:8px; padding:6px 0;
+}
+.agent-phase-dot {
+  width:8px; height:8px; border-radius:50%; flex-shrink:0;
+}
+.agent-phase-dot.done { background:var(--green); }
+.agent-phase-dot.current { background:var(--yellow); }
+.agent-phase-dot.future { background:var(--text3); }
+.agent-phase-text { font-size:10px; color:var(--text2); }
+.agent-phase-text strong { color:var(--text); }
+
 /* FOOTER */
 .footer {
   padding:10px 24px; border-top:1px solid var(--border);
@@ -533,6 +627,63 @@ FOOTER: Data sources and refresh timestamp. CSS Grid layout, smooth transitions,
       <div class="panel-title"><i class="fas fa-chart-pie"></i>GPV by Category</div>
     </div>
     <div style="padding:10px 16px;max-height:220px;overflow-y:auto;" id="catChart"></div>
+  </div>
+</div>
+
+
+<!-- DATA AGENT -->
+<button class="agent-fab" id="agentFab" onclick="toggleAgentPanel()" title="Data Agent">
+  <i class="fas fa-robot"></i>
+</button>
+<div class="agent-panel" id="agentPanel">
+  <div class="agent-panel-header">
+    <div class="agent-panel-title"><i class="fas fa-robot"></i>Data Agent</div>
+    <div class="agent-panel-badge">Phase 1 Ready</div>
+  </div>
+  <div class="agent-panel-body">
+    <div class="agent-desc">
+      Ask natural language questions about your sellers, book of business, comp metrics, hardware, churn risk, and more &mdash; powered by <strong>25+ Snowflake tables</strong> via Goose.
+    </div>
+
+    <div class="agent-section-label">Try asking</div>
+    <button class="agent-question-btn" onclick="copyAgentQ(this)"><i class="fas fa-chart-line"></i>How am I pacing to my GPV goal this quarter?</button>
+    <button class="agent-question-btn" onclick="copyAgentQ(this)"><i class="fas fa-user-slash"></i>Who is at highest churn risk in my book?</button>
+    <button class="agent-question-btn" onclick="copyAgentQ(this)"><i class="fas fa-box-open"></i>What products is Bromley's Bread using?</button>
+    <button class="agent-question-btn" onclick="copyAgentQ(this)"><i class="fas fa-hdd"></i>Which sellers have hardware approaching end of life?</button>
+    <button class="agent-question-btn" onclick="copyAgentQ(this)"><i class="fas fa-headset"></i>How many open CS cases do my sellers have?</button>
+    <button class="agent-question-btn" onclick="copyAgentQ(this)"><i class="fas fa-arrow-down"></i>Show me sellers with declining transactions this quarter</button>
+
+    <div class="agent-section-label">How to use</div>
+    <div class="agent-desc">
+      Open <strong>Goose</strong> and paste this command to load the data agent recipe. Then ask any question about your book.
+    </div>
+    <div class="agent-copy-block">
+      <code class="agent-copy-code" id="agentRecipeCmd">load the file recipes/seller-signals-agent.yaml</code>
+      <button class="agent-copy-btn" onclick="copyRecipeCmd()" title="Copy to clipboard"><i class="fas fa-copy"></i></button>
+    </div>
+
+    <div class="agent-section-label">Data Coverage (25+ tables)</div>
+    <div class="agent-table-grid">
+      <span class="agent-table-tag">Churn Predictions</span>
+      <span class="agent-table-tag">Hardware Lifecycle</span>
+      <span class="agent-table-tag">Product Adoption</span>
+      <span class="agent-table-tag">Cross-Sell Funnels</span>
+      <span class="agent-table-tag">Seller Insights</span>
+      <span class="agent-table-tag">Engagement</span>
+      <span class="agent-table-tag">Device Health</span>
+      <span class="agent-table-tag">GPV &amp; AR Metrics</span>
+      <span class="agent-table-tag">Pacing to Goal</span>
+      <span class="agent-table-tag">AM Activities</span>
+      <span class="agent-table-tag">Contracts</span>
+      <span class="agent-table-tag">CS Cases</span>
+      <span class="agent-table-tag">SaaS Subscriptions</span>
+      <span class="agent-table-tag">NNRO</span>
+    </div>
+
+    <div class="agent-section-label">Roadmap</div>
+    <div class="agent-phase-row"><div class="agent-phase-dot done"></div><div class="agent-phase-text"><strong>Recipe built</strong> &mdash; ask questions via Goose</div></div>
+    <div class="agent-phase-row"><div class="agent-phase-dot current"></div><div class="agent-phase-text"><strong>Next:</strong> Embedded chat widget + backend</div></div>
+    <div class="agent-phase-row"><div class="agent-phase-dot future"></div><div class="agent-phase-text"><strong>Future:</strong> Full agentic call prep briefings</div></div>
   </div>
 </div>
 
@@ -1839,6 +1990,51 @@ renderGPVChart();
 renderActivityBars();
 renderQTD();
 renderCategoryChart();
+
+// ===== DATA AGENT PANEL =====
+function toggleAgentPanel() {
+  var panel = document.getElementById("agentPanel");
+  var fab = document.getElementById("agentFab");
+  var isOpen = panel.classList.contains("visible");
+  if (isOpen) {
+    panel.classList.remove("visible");
+    fab.classList.remove("open");
+    fab.innerHTML = '<i class="fas fa-robot"></i>';
+  } else {
+    panel.classList.add("visible");
+    fab.classList.add("open");
+    fab.innerHTML = '<i class="fas fa-plus"></i>';
+  }
+}
+
+function copyAgentQ(btn) {
+  var text = btn.textContent.trim();
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(function() {
+      var origBorder = btn.style.borderColor;
+      var origColor = btn.style.color;
+      btn.style.borderColor = "var(--green)";
+      btn.style.color = "var(--green)";
+      setTimeout(function() { btn.style.borderColor = ""; btn.style.color = ""; }, 1200);
+    });
+  }
+}
+
+function copyRecipeCmd() {
+  var code = document.getElementById("agentRecipeCmd").textContent;
+  var btn = document.querySelector(".agent-copy-btn");
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(code).then(function() {
+      btn.classList.add("copied");
+      btn.innerHTML = '<i class="fas fa-check"></i>';
+      setTimeout(function() {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<i class="fas fa-copy"></i>';
+      }, 2000);
+    });
+  }
+}
+
 </script>
 </body>
 </html>
