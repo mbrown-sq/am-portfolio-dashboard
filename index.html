@@ -247,6 +247,30 @@ svg text { font-family:'Inter',sans-serif; }
 .qtd-bar-fill { height:100%; border-radius:2px; background:var(--blue); }
 
 
+
+/* RISK LEGEND / INFO */
+.risk-info-toggle {
+  background:none; border:1px solid var(--border); color:var(--text3);
+  width:22px; height:22px; border-radius:50%; cursor:pointer; font-size:10px;
+  display:flex; align-items:center; justify-content:center; transition:all .15s;
+}
+.risk-info-toggle:hover { border-color:var(--blue); color:var(--blue); }
+.risk-info-toggle.active { border-color:var(--blue); color:var(--blue); background:var(--blue-dim); }
+.risk-legend-box {
+  display:none; padding:12px 16px; border-top:1px solid var(--border);
+  background:var(--bg); font-size:10px; line-height:1.7; color:var(--text2);
+}
+.risk-legend-box.visible { display:block; }
+.risk-legend-row {
+  display:flex; align-items:flex-start; gap:8px; margin-bottom:8px;
+}
+.risk-legend-row:last-child { margin-bottom:0; }
+.risk-legend-dot {
+  width:8px; height:8px; border-radius:50%; flex-shrink:0; margin-top:4px;
+}
+.risk-legend-label { font-weight:700; color:var(--text); }
+.risk-legend-detail { color:var(--text3); }
+
 /* DATA AGENT LAUNCHER */
 .agent-fab {
   position:fixed; bottom:24px; right:24px; z-index:900;
@@ -595,8 +619,26 @@ FOOTER: Data sources and refresh timestamp. CSS Grid layout, smooth transitions,
   <div class="panel">
     <div class="panel-header">
       <div class="panel-title" id="gpvPanelTitle"><i class="fas fa-chart-area"></i>GPV Trend (6 Mo)</div>
+      <button class="risk-info-toggle" id="riskInfoToggle" onclick="toggleRiskLegend()" title="What do these mean?" style="display:none;"><i class="fas fa-info"></i></button>
     </div>
     <div class="chart-container" id="gpvChart"></div>
+    <div class="risk-legend-box" id="riskLegendBox">
+      <div class="risk-legend-row">
+        <div class="risk-legend-dot" style="background:#00c853;"></div>
+        <div><span class="risk-legend-label">Healthy</span> <span class="risk-legend-detail">&mdash; Health score 65+. Growing or stable GPV, recent AM contact, multiple products adopted. These sellers are engaged and expanding.</span></div>
+      </div>
+      <div class="risk-legend-row">
+        <div class="risk-legend-dot" style="background:#ffc107;"></div>
+        <div><span class="risk-legend-label">Watch</span> <span class="risk-legend-detail">&mdash; Health score 40&ndash;64. Flat or slightly declining GPV, gaps in contact or product adoption. Not yet at risk, but need proactive attention.</span></div>
+      </div>
+      <div class="risk-legend-row">
+        <div class="risk-legend-dot" style="background:#ff3d57;"></div>
+        <div><span class="risk-legend-label">At Risk</span> <span class="risk-legend-detail">&mdash; Health score below 40. Declining GPV, long gaps since last contact, low product adoption, or no contract. These sellers need immediate outreach.</span></div>
+      </div>
+      <div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--border); color:var(--text3); font-size:9px;">
+        <i class="fas fa-lightbulb" style="color:var(--yellow);margin-right:4px;"></i>Health score combines GPV trend, contact recency, product count, contract status, and tenure. Click any seller row above for full retention intelligence.
+      </div>
+    </div>
   </div>
   <div class="panel">
     <div class="panel-header">
@@ -915,6 +957,9 @@ function renderGPVChart() {
   if (currentAM === 'all') {
     // Team view: show the 6-month GPV trend line chart
     titleEl.innerHTML = '<i class="fas fa-chart-area"></i>GPV Trend (6 Mo)';
+    document.getElementById('riskInfoToggle').style.display = 'none';
+    document.getElementById('riskLegendBox').classList.remove('visible');
+    document.getElementById('riskInfoToggle').classList.remove('active');
     const w=420, h=160, pad={t:20,r:20,b:30,l:50};
     const cw=w-pad.l-pad.r, ch=h-pad.t-pad.b;
     const vals = gpvTrend.map(d=>d.val);
@@ -956,6 +1001,7 @@ function renderGPVChart() {
   } else {
     // AM view: show GPV by Risk Status breakdown
     titleEl.innerHTML = '<i class="fas fa-shield-alt"></i>GPV by Risk Status';
+    document.getElementById('riskInfoToggle').style.display = 'flex';
     const myAccts = accounts.filter(a => a.am === currentAM);
     const buckets = [
       { key: 'healthy', label: 'Healthy', color: '#00c853', dimColor: 'rgba(0,200,83,0.15)' },
@@ -2056,6 +2102,20 @@ renderGPVChart();
 renderActivityBars();
 renderQTD();
 renderCategoryChart();
+
+// ===== RISK LEGEND =====
+function toggleRiskLegend() {
+  var box = document.getElementById("riskLegendBox");
+  var btn = document.getElementById("riskInfoToggle");
+  var isOpen = box.classList.contains("visible");
+  if (isOpen) {
+    box.classList.remove("visible");
+    btn.classList.remove("active");
+  } else {
+    box.classList.add("visible");
+    btn.classList.add("active");
+  }
+}
 
 // ===== DATA AGENT PANEL =====
 function toggleAgentPanel() {
