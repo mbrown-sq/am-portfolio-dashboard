@@ -208,7 +208,7 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
 
 /* BOTTOM GRID */
 .bottom-grid {
-  display:grid; grid-template-columns:35% 35% 30%; gap:12px;
+  display:grid; grid-template-columns:25% 25% 25% 25%; gap:12px;
   padding:12px 24px 16px;
 }
 .bottom-grid .panel { min-height:0; }
@@ -260,7 +260,7 @@ svg text { font-family:'Inter',sans-serif; }
 @media (max-width:1200px) {
   .main-content { grid-template-columns:1fr; }
   .table-panel, .alerts-panel { margin:0 0 12px 0; }
-  .bottom-grid { grid-template-columns:1fr; }
+  .bottom-grid { grid-template-columns:1fr 1fr; }
   .kpi-row { grid-template-columns:repeat(3,1fr); }
 }
 
@@ -409,6 +409,7 @@ FOOTER: Data sources and refresh timestamp. CSS Grid layout, smooth transitions,
       <button class="filter-btn risk-green" data-filter="healthy" onclick="setFilter('healthy',this)">Healthy</button>
       <button class="filter-btn risk-yellow" data-filter="watch" onclick="setFilter('watch',this)">Watch</button>
       <button class="filter-btn risk-red" data-filter="at-risk" onclick="setFilter('at-risk',this)">At-Risk</button>
+      <button class="filter-btn" data-filter="contract" onclick="setFilter('contract',this)" style="margin-left:6px;"><i class="fas fa-file-contract" style="margin-right:3px;"></i>Contract</button>
     </div>
     <div class="table-scroll" id="tableScroll">
       <table class="data-table">
@@ -420,9 +421,10 @@ FOOTER: Data sources and refresh timestamp. CSS Grid layout, smooth transitions,
             <th>Trend</th>
             <th onclick="sortTable(3)">GPV (A$)</th>
             <th onclick="sortTable(4)">YoY%</th>
-            <th onclick="sortTable(5)">Days</th>
+            <th onclick="sortTable(5)">Last Contact</th>
             <th onclick="sortTable(6)">Health</th>
             <th onclick="sortTable(7)">Risk</th>
+            <th>Type</th>
             <th>AM</th>
             <th>SFDC</th>
           </tr>
@@ -477,6 +479,12 @@ FOOTER: Data sources and refresh timestamp. CSS Grid layout, smooth transitions,
     </div>
     <div class="qtd-scroll" id="qtdPanel"></div>
   </div>
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title"><i class="fas fa-chart-pie"></i>GPV by Category</div>
+    </div>
+    <div style="padding:10px 16px;max-height:220px;overflow-y:auto;" id="catChart"></div>
+  </div>
 </div>
 
 <!-- FOOTER -->
@@ -513,16 +521,25 @@ Object.keys(DATA.amSummary).forEach(key => {
 
 // Map accounts from DATA.accounts (all 1729)
 const accounts = DATA.accounts.map(a => ({
-  name: a.n, cat: a.c, tier: a.t, gpv: a.g, yoy: a.y,
+  name: a.n, cat: a.c, tier: a.t, gpv: a.g, gpv9: a.g9, yoy: a.y,
   days: a.d, health: a.h, risk: a.r === 'at_risk' ? 'at-risk' : a.r,
   am: a.am, sf: a.sf, ar: a.ar, at: a.at, locations: a.l,
-  tenure: a.tn, contract: a.ct, activities30d: a.a30, csatStars: a.cs, ci: a.ci
+  tenure: a.tn, contract: a.ct, activities30d: a.a30, csatStars: a.cs, ci: a.ci,
+  lastProcessed: a.lp
 }));
 
 // Map alerts from DATA.alerts
-const alerts = DATA.alerts.map(a => ({
-  name: a.n, am: amFullNames[a.am] || a.am, days: a.d, reason: a.reason
-}));
+// Build alert-to-account lookup for enrichment
+const alertAcctMap = {};
+DATA.accounts.forEach(a => { alertAcctMap[a.n] = a; });
+
+const alerts = DATA.alerts.map(a => {
+  const acct = alertAcctMap[a.n] || {};
+  return {
+    name: a.n, am: amFullNames[a.am] || a.am, days: a.d, reason: a.reason,
+    sf: acct.sf || '', gpv: acct.g || 0, contract: acct.ct || false
+  };
+});
 
 // Map weekly activity — use latest week only for "This Week"
 const latestWeek = DATA.weekly.reduce((max, w) => w.week > max ? w.week : max, '');
@@ -604,7 +621,8 @@ function renderKPIs() {
 function getFilteredAccounts() {
   let list = accounts;
   if (currentAM !== 'all') list = list.filter(a => a.am === currentAM);
-  if (currentFilter !== 'all') list = list.filter(a => a.risk === currentFilter);
+  if (currentFilter === 'contract') list = list.filter(a => a.contract);
+  else if (currentFilter !== 'all') list = list.filter(a => a.risk === currentFilter);
   if (currentSearch) {
     const s = currentSearch.toLowerCase();
     list = list.filter(a => a.name.toLowerCase().includes(s));
@@ -660,17 +678,22 @@ function renderAlerts() {
     filtered = alerts.filter(a => a.am === amFullName);
   }
   document.getElementById('alertCount').textContent = filtered.length + ' alerts';
-  scroll.innerHTML = filtered.map((a, i) => `
-    <div class="alert-item fade-in" id="alert-${i}">
-      <div class="alert-icon"><i class="fas fa-exclamation-triangle"></i></div>
-      <div class="alert-body">
-        <div class="alert-name">${a.name}</div>
-        <div class="alert-meta">${a.am} &bull; <span>${a.days} days</span> since contact</div>
-        <div class="alert-reason"><i class="fas fa-info-circle" style="margin-right:4px;"></i>${a.reason}</div>
-      </div>
-      <button class="alert-dismiss" onclick="dismissAlert(${i})" title="Dismiss"><i class="fas fa-times"></i></button>
-    </div>
-  `).join('');
+  scroll.innerHTML = filtered.map((a, i) => {
+    const sfLink = a.sf ? 'https://squareinc.lightning.force.com/lightning/r/Account/' + a.sf + '/view' : '#';
+    return '<div class="alert-item fade-in" id="alert-' + i + '">' +
+      '<div class="alert-icon"><i class="fas fa-exclamation-triangle"></i></div>' +
+      '<div class="alert-body">' +
+        '<div class="alert-name">' + a.name + (a.contract ? ' <span class=\'badge-contract\' style=\'font-size:8px;\'>CONTRACT</span>' : '') + '</div>' +
+        '<div class="alert-meta">' + a.am + ' &bull; GPV A$' + (a.gpv||0).toFixed(2) + 'M</div>' +
+        '<div class="alert-reason"><i class="fas fa-info-circle" style="margin-right:4px;"></i>' + a.reason + '</div>' +
+        '<div style="margin-top:6px;display:flex;gap:6px;">' +
+          '<a class="detail-btn" href="' + sfLink + '" target="_blank" style="font-size:9px;padding:4px 10px;"><i class="fas fa-external-link-alt"></i>SFDC</a>' +
+          '<button class="detail-btn secondary" style="font-size:9px;padding:4px 10px;" onclick="event.stopPropagation();searchAccount(\'' + a.name.replace(/'/g, "\\'") + '\')"><i class="fas fa-search"></i>Find</button>' +
+        '</div>' +
+      '</div>' +
+      '<button class="alert-dismiss" onclick="dismissAlert(' + i + ')" title="Dismiss"><i class="fas fa-times"></i></button>' +
+    '</div>';
+  }).join('');
 }
 
 function dismissAlert(i) {
@@ -791,6 +814,7 @@ document.getElementById('amSelect').addEventListener('change', function() {
   renderAlerts();
   renderActivityBars();
   renderQTD();
+  renderCategoryChart();
 });
 
 
@@ -864,9 +888,10 @@ renderTable = function() {
       '<td>'+sparkHtml+'</td>' +
       '<td style="font-weight:700;">$'+a.gpv.toFixed(1)+'M</td>' +
       '<td class="'+(a.yoy>=0?'yoy-pos':'yoy-neg')+'" style="font-weight:600;">'+(a.yoy>=0?'+':'')+a.yoy+'%</td>' +
-      '<td style="color:'+(a.days>60?'var(--red)':a.days>30?'var(--yellow)':'var(--text2)')+';font-weight:'+(a.days>60?'700':'400')+';">'+a.days+'</td>' +
+      '<td style="font-size:10px;color:'+(a.days>60?'var(--red)':a.days>30?'var(--yellow)':'var(--text2)')+';font-weight:'+(a.days>60?'700':'400')+';">'+(a.lastProcessed||'—')+'</td>' +
       '<td><div class="health-bar-wrap"><div class="health-bar-fill" style="width:'+a.health+'%;background:'+healthColor+';"></div></div></td>' +
       '<td><span class="risk-flag '+riskClass+'">'+riskLabel+'</span></td>' +
+      '<td>'+(a.contract?'<span class="badge-contract" style="font-size:8px;">CONTRACT</span>':'<span style="font-size:8px;color:var(--text3);">Std</span>')+'</td>' +
       '<td style="color:var(--text3);font-size:10px;">'+(amNames[a.am]||a.am)+'</td>' +
       '<td><a class="sfdc-link" href="'+sfUrl+'" target="_blank" onclick="event.stopPropagation();" title="Open in Salesforce"><i class="fas fa-external-link-alt"></i></a></td>' +
     '</tr>';
@@ -897,7 +922,7 @@ function toggleDetail(idx) {
   const sparkLarge = makeLargeSparkline(a.spark, a.yoy >= 0);
   const daysWarning = a.days >= 999 ? ' <span style="color:var(--orange);font-size:9px;" title="999 days may indicate merchant token mismatch — verify in SFDC">⚠ verify</span>' : '';
   
-  const detailHtml = '<tr class="detail-row" id="detail-row" data-idx="'+idx+'"><td colspan="11"><div class="detail-card">' +
+  const detailHtml = '<tr class="detail-row" id="detail-row" data-idx="'+idx+'"><td colspan="12"><div class="detail-card">' +
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
       '<div><div style="font-size:14px;font-weight:700;">'+a.name+'</div>' +
       '<div style="font-size:10px;color:var(--text3);margin-top:2px;">'+a.cat.replace(/_/g,' ')+' &bull; '+(a.contract?'<span class=\'badge-contract\'>CONTRACT</span>':'<span class=\'badge-standard\'>STANDARD</span>')+' &bull; '+a.tenure+' months with Square</div></div>' +
@@ -1004,6 +1029,50 @@ renderActivityBars = function() {
   });
 })();
 
+// Search from alert
+function searchAccount(name) {
+  document.getElementById('searchBox').value = name;
+  currentSearch = name;
+  currentFilter = 'all';
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('.filter-btn[data-filter="all"]').classList.add('active');
+  renderTable();
+  document.getElementById('tableScroll').scrollTop = 0;
+}
+
+// GPV by Category chart
+function renderCategoryChart() {
+  const container = document.getElementById('catChart');
+  if (!container) return;
+  let list = accounts;
+  if (currentAM !== 'all') list = list.filter(a => a.am === currentAM);
+  const catData = {};
+  list.forEach(a => {
+    if (!catData[a.cat]) catData[a.cat] = { gpv: 0, count: 0 };
+    catData[a.cat].gpv += a.gpv;
+    catData[a.cat].count++;
+  });
+  const sorted = Object.entries(catData).sort((a,b) => b[1].gpv - a[1].gpv);
+  const maxGpv = sorted.length ? sorted[0][1].gpv : 1;
+  const catColors = { food:'var(--orange)', retail:'var(--blue-light)', beauty:'#e91e63', services:'#ce93d8', fitness:'var(--green)', events:'var(--yellow)', drinks:'#00bcd4' };
+  container.innerHTML = sorted.map(([cat, d]) => {
+    const pct = (d.gpv / maxGpv * 100).toFixed(0);
+    const icon = catIcons[cat] || 'fa-circle';
+    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
+      '<span class="cat-icon cat-' + cat + '" style="flex-shrink:0;"><i class="fas ' + icon + '"></i></span>' +
+      '<div style="flex:1;">' +
+        '<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px;">' +
+          '<span style="color:var(--text2);text-transform:capitalize;">' + cat + ' <span style="color:var(--text3);">(' + d.count + ')</span></span>' +
+          '<span style="color:var(--text);font-weight:700;">A$' + d.gpv.toFixed(1) + 'M</span>' +
+        '</div>' +
+        '<div style="height:6px;background:var(--bg);border-radius:3px;overflow:hidden;">' +
+          '<div style="height:100%;width:' + pct + '%;background:' + (catColors[cat]||'var(--blue)') + ';border-radius:3px;transition:width .3s;"></div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
 // INIT
 renderKPIs();
 renderTable();
@@ -1011,6 +1080,7 @@ renderAlerts();
 renderGPVChart();
 renderActivityBars();
 renderQTD();
+renderCategoryChart();
 </script>
 </body>
 </html>
