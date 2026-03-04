@@ -613,6 +613,9 @@ const qtdSeller = qtdEntries.map(e => ({name:e.name, val:e.biz_touched, key:e.ke
 // Map GPV trend
 const gpvTrend = DATA.gpvTrend.map(d => ({ month: d.m, val: d.v }));
 
+// Feature news for seller-matched awareness
+const featureNews = DATA.featureNews || [];
+
 const catIcons = {
   food:'fa-utensils', retail:'fa-shopping-bag', beauty:'fa-spa',
   fitness:'fa-dumbbell', services:'fa-concierge-bell', events:'fa-ticket-alt', drinks:'fa-coffee'
@@ -920,6 +923,96 @@ function velocityBadge(vel) {
 
 
 
+
+function matchFeatures(a) {
+  return featureNews.filter(function(f) {
+    var m = f.match || {};
+    if (m.cat && m.cat.indexOf(a.cat) < 0) return false;
+    if (m.minTicket && (a.avgTicket||0) < m.minTicket) return false;
+    if (m.minLocations && (a.locations||0) < m.minLocations) return false;
+    if (m.minGpv && a.gpv < m.minGpv) return false;
+    if (m.hasProduct) {
+      var found = false;
+      m.hasProduct.forEach(function(p){ if (a.products.indexOf(p) >= 0) found = true; });
+      if (!found) return false;
+    }
+    return true;
+  });
+}
+
+function featureNewsHtml(a) {
+  var matched = matchFeatures(a);
+  if (matched.length === 0) return '';
+  
+  var badgeColors = {
+    'NEW':'var(--green)','FIX':'var(--blue-light)','BENEFIT':'var(--yellow)',
+    'SAVE':'var(--green)','UPDATE':'var(--text2)','IMPROVEMENT':'var(--blue-light)'
+  };
+  var badgeBgs = {
+    'NEW':'var(--green-dim)','FIX':'var(--blue-dim)','BENEFIT':'var(--yellow-dim)',
+    'SAVE':'var(--green-dim)','UPDATE':'rgba(94,122,148,0.15)','IMPROVEMENT':'var(--blue-dim)'
+  };
+  
+  var rows = matched.map(function(f) {
+    return '<div style="padding:6px 0;border-bottom:1px solid rgba(30,51,71,0.3);">' +
+      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">' +
+        '<span style="font-size:8px;padding:1px 6px;border-radius:6px;font-weight:700;background:' + (badgeBgs[f.badge]||'var(--blue-dim)') + ';color:' + (badgeColors[f.badge]||'var(--blue-light)') + ';">' + f.badge + '</span>' +
+        '<span style="font-size:10px;font-weight:700;color:var(--text);">' + f.name + '</span>' +
+        '<span style="font-size:9px;color:var(--text3);margin-left:auto;">' + f.date + '</span>' +
+      '</div>' +
+      '<div style="font-size:11px;color:var(--text2);line-height:1.5;font-style:italic;">"' + f.talk + '"</div>' +
+    '</div>';
+  }).join('');
+  
+  return '<div style="background:var(--bg3);border-radius:8px;padding:12px;margin:8px 0;border-left:3px solid var(--green);">' +
+    '<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;"><i class="fas fa-bullhorn" style="color:var(--green);margin-right:4px;"></i>Relevant Feature Updates — mention on your next call</div>' +
+    rows +
+  '</div>';
+}
+
+function churnRiskFraming(a) {
+  var lines = [];
+  
+  // Dollar value of this account
+  var gpvDollar = (a.gpv * 1000000);
+  var gpvStr = gpvDollar >= 1000000 ? 'A$' + (a.gpv).toFixed(2) + 'M' : 'A$' + (gpvDollar/1000).toFixed(0) + 'K';
+  
+  // Failure of Education risk
+  var prods = a.products.filter(function(p){ return p && p !== 'UNKNOWN' && p !== 'Register POS' && p !== 'Register Terminal'; });
+  if (prods.length === 0 && a.tenure >= 24) {
+    lines.push({type:'education', icon:'📚', text:'<strong>Failure of Education risk:</strong> This seller has been on free POS for ' + (a.tenure/12).toFixed(0) + ' years with no product expansion. They may not know what Square can do for them. A discovery call could unlock significant value — for them and for us.'});
+  }
+  
+  // Failure of Responsiveness risk
+  if (a.days >= 120 && a.velocity < -5) {
+    lines.push({type:'responsive', icon:'⏰', text:'<strong>Failure of Responsiveness risk:</strong> Last DM ' + a.days + ' days ago and GPV declining (' + a.velocity.toFixed(0) + '%). If they\'re having issues, they may already be looking elsewhere. A proactive call now could prevent churn.'});
+  } else if (a.days >= 150) {
+    lines.push({type:'responsive', icon:'⏰', text:'<strong>Responsiveness gap:</strong> ' + a.days + ' days since last DM. Even if everything is fine, silence can feel like indifference. A quick check-in shows you\'re paying attention.'});
+  }
+  
+  // High-value retention framing
+  if (a.risk === 'at-risk' || (a.velocity < -10 && a.gpv > 0.5)) {
+    lines.push({type:'value', icon:'💰', text:'This seller represents <strong>' + gpvStr + ' in annual GPV</strong> and <strong>A$' + (a.ar).toLocaleString('en-AU',{maximumFractionDigits:0}) + ' in revenue</strong>. Losing them doesn\'t just hurt your portfolio — it\'s real dollars walking out the door.'});
+  }
+  
+  // Payments-only at-risk segment
+  if (prods.length === 0 && a.gpv > 0.5) {
+    lines.push({type:'segment', icon:'🎯', text:'<strong>At-risk segment:</strong> Payments-only sellers above A$500K are one of the highest-churn cohorts across Square. Product adoption is the strongest retention lever — even one add-on product significantly reduces churn probability.'});
+  }
+  
+  // F&B specific risk
+  if (a.cat === 'food' && a.velocity < -5 && a.gpv > 0.3) {
+    lines.push({type:'segment', icon:'🍽️', text:'<strong>F&B retention watch:</strong> Food & beverage is the highest-churn category for SMB+. Common drivers: 3P delivery fee pressure, split payment frustrations, printer/hardware reliability. Ask what\'s been frustrating them lately.'});
+  }
+  
+  if (lines.length === 0) return '';
+  
+  return '<div style="background:var(--bg3);border-radius:8px;padding:12px;margin:8px 0;border-left:3px solid var(--red);">' +
+    '<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;"><i class="fas fa-shield-alt" style="color:var(--red);margin-right:4px;"></i>Retention Intelligence</div>' +
+    lines.map(function(l){ return '<div style="padding:5px 0;font-size:11px;color:var(--text);line-height:1.6;">' + l.icon + ' ' + l.text + '</div>'; }).join('') +
+  '</div>';
+}
+
 function nextBestActions(a) {
   var actions = [];
   
@@ -997,6 +1090,13 @@ function nextBestActions(a) {
   if (a.velocity > 25) actions.push({pri:7, type:'celebrate', icon:'🎉', text:'Fastest growth period — acknowledge their success. "I noticed your volume is up ' + a.velocity.toFixed(0) + '%..."', category:'Recognition'});
   
   if (prods.length >= 5) actions.push({pri:8, type:'celebrate', icon:'🌟', text:'Power user with ' + prods.length + ' products — consider for case study, referral program, or beta testing.', category:'Advocacy'});
+  
+  // Feature awareness actions
+  var matched = matchFeatures(a);
+  if (matched.length > 0) {
+    var topFeature = matched[0];
+    actions.push({pri:5, type:'grow', icon:'🆕', text:topFeature.name + ' just shipped — relevant to this seller. Mention it: "' + topFeature.talk.substring(0, 80) + '..."', category:'Feature News'});
+  }
   
   // Sort by priority and cap at 5
   actions.sort(function(a,b){ return a.pri - b.pri; });
@@ -1338,6 +1438,12 @@ function toggleDetail(idx) {
       
       // Next Best Actions
       nextBestActionsHtml(a) +
+      
+      // Feature News
+      featureNewsHtml(a) +
+      
+      // Retention Intelligence
+      churnRiskFraming(a) +
       
       // Metrics grid
       '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0;">' +
