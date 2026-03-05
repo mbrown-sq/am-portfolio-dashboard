@@ -110,7 +110,7 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
 .panel-title i { color:var(--blue); margin-right:6px; }
 
 /* TABLE PANEL */
-.table-panel { margin-right:6px; }
+.table-panel { margin-right:6px; display:flex; flex-direction:column; }
 .table-controls {
   display:flex; align-items:center; gap:8px; padding:10px 16px;
   border-bottom:1px solid var(--border); flex-wrap:wrap;
@@ -177,15 +177,15 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
 .risk-watch { background:var(--yellow-dim); color:var(--yellow); }
 .risk-at-risk { background:var(--red-dim); color:var(--red); }
 
-.table-scroll { max-height:500px; overflow-y:auto; }
+.table-scroll { flex:1; overflow-y:auto; max-height:500px; }
 .table-footer {
   padding:8px 16px; border-top:1px solid var(--border);
   font-size:10px; color:var(--text3); display:flex; justify-content:space-between;
 }
 
 /* ALERTS PANEL */
-.alerts-panel { margin-left:6px; }
-.alerts-scroll { max-height:340px; overflow-y:auto; padding:8px; }
+.alerts-panel { margin-left:6px; display:flex; flex-direction:column; }
+.alerts-scroll { flex:1; overflow-y:auto; padding:8px; min-height:0; }
 .alert-item {
   background:var(--bg3); border:1px solid var(--border); border-left:3px solid var(--red);
   border-radius:var(--radius); padding:10px 12px; margin-bottom:6px;
