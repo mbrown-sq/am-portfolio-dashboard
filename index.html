@@ -271,6 +271,25 @@ svg text { font-family:'Inter',sans-serif; }
 .risk-legend-label { font-weight:700; color:var(--text); }
 .risk-legend-detail { color:var(--text3); }
 
+
+/* SELLER ONE-PAGER */
+.onepager-btn {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:8px 14px; border-radius:6px; font-size:11px; font-weight:600;
+  font-family:"Inter",sans-serif; cursor:pointer; transition:all .15s;
+  background:linear-gradient(135deg, #006AFF, #338bff); color:#fff;
+  border:none; text-decoration:none;
+}
+.onepager-btn:hover { filter:brightness(1.15); transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,106,255,0.3); }
+.onepager-btn i { font-size:10px; }
+.onepager-copied {
+  position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+  background:var(--green); color:#fff; padding:8px 20px; border-radius:20px;
+  font-size:11px; font-weight:600; font-family:"Inter",sans-serif;
+  z-index:9999; animation:fadeIn .2s ease;
+  box-shadow:0 4px 16px rgba(0,200,83,0.3);
+}
+
 /* DATA AGENT LAUNCHER */
 .agent-fab {
   position:fixed; bottom:24px; right:24px; z-index:900;
@@ -1967,8 +1986,9 @@ function toggleDetail(idx) {
       similarSellersHtml(a) +
       
       // Action buttons
-      '<div style="display:flex;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid var(--border);">' +
+      '<div style="display:flex;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid var(--border);flex-wrap:wrap;">' +
         '<a class="detail-btn" href="' + sfUrl + '" target="_blank"><i class="fas fa-external-link-alt"></i>View in Salesforce</a>' +
+        '<button class="onepager-btn" onclick="copyOnePagerPrompt(\'' + a.name.replace(/'/g, "\\'") + '\', \'' + (a.sf||'') + '\')" title="Copy a Goose prompt to generate a full seller briefing"><i class="fas fa-file-alt"></i>Seller One-Pager</button>' +
         '<a class="detail-btn secondary" href="#"><i class="fas fa-plus-circle"></i>Log Activity</a>' +
         '<button class="detail-btn secondary" onclick="closeModal()" style="margin-left:auto;"><i class="fas fa-times"></i>Close</button>' +
       '</div>' +
@@ -2137,6 +2157,21 @@ function toggleRiskLegend() {
   } else {
     box.classList.add("visible");
     btn.classList.add("active");
+  }
+}
+
+// ===== SELLER ONE-PAGER =====
+function copyOnePagerPrompt(sellerName, sfdcId) {
+  var prompt = "Load the file recipes/seller-one-pager.yaml then generate a one-pager for " + sellerName;
+  if (sfdcId) prompt += " (SFDC: " + sfdcId + ")";
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(prompt).then(function() {
+      var toast = document.createElement("div");
+      toast.className = "onepager-copied";
+      toast.innerHTML = '<i class="fas fa-check" style="margin-right:6px;"></i>Copied! Paste into Goose to generate one-pager';
+      document.body.appendChild(toast);
+      setTimeout(function() { toast.style.animation = "fadeOut .3s ease"; setTimeout(function() { toast.remove(); }, 300); }, 2500);
+    });
   }
 }
 

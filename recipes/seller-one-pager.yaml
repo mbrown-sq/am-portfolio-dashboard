@@ -1,0 +1,273 @@
+name: seller-one-pager
+description: |
+  Generates a comprehensive one-pager briefing for a specific AU SMB seller.
+  Pulls live data from Snowflake: business details, AM activity history,
+  Gong call summaries, CS support cases, product adoption, and GPV trends.
+
+  Usage: Provide the seller's business name and SFDC Account ID.
+  Example: "Generate a one-pager for Bromley's Bread (SFDC: 0014W00003VHs1AQAT)"
+
+extensions:
+  - queryexpert
+  - snowflake
+  - developer
+
+instructions: |
+  You are a seller briefing generator for AU SMB Account Managers. When given a seller name
+  and/or SFDC Account ID, you generate a comprehensive one-pager that an AM can read in
+  60 seconds before picking up the phone.
+
+  ## STEP 1: IDENTIFY THE SELLER
+
+  Use whatever the AM provides (business name, SFDC Account ID, or both) to find the seller:
+
+  ```sql
+  SELECT
+    aeo.BUSINESS_NAME,
+    aeo.BUSINESS_ID,
+    aeo.SBS_BOOK_OF_BUSINESS_ID_C AS SFDC_ACCOUNT_ID,
+    aeo.AM_SERVICE_LEVEL,
+    aeo.SELLER_CLASS,
+    ame.FIRST_NAME || ' ' || ame.LAST_NAME AS AM_NAME,
+    ame.LDAP AS AM_LDAP
+  FROM app_merch_growth.app_merch_growth_etl.am_fact_account_ownership_v2 aeo
+  JOIN app_merch_growth.app_merch_growth_etl.am_fact_employment_current ame
+    ON aeo.ACTIVE_OWNER_ID = ame.SFDC_OWNER_ID
+  WHERE ame.AM_TEAM = 'AU SMB'
+    AND aeo.IS_ACTIVELY_MANAGED = 1
+    AND (LOWER(aeo.BUSINESS_NAME) LIKE LOWER('%<NAME>%')
+         OR aeo.SBS_BOOK_OF_BUSINESS_ID_C = '<SFDC_ID>')
+  ```
+
+  If multiple matches, ask the AM to clarify. Once identified, store the BUSINESS_ID,
+  SFDC Account ID, and BUSINESS_NAME for all subsequent queries.
+
+  ## STEP 2: PULL ALL DATA (run these in parallel where possible)
+
+  ### 2a. Business Overview & Location
+  ```sql
+  SELECT
+    vu.RECEIPT_CITY, vu.RECEIPT_STATE, vu.RECEIPT_POSTAL_CODE,
+    COUNT(DISTINCT CASE WHEN vu.IS_UNIT = 1 AND vu.UNIT_ACTIVE_STATUS = TRUE THEN vu.BEST_AVAILABLE_UNIT_TOKEN END) AS active_locations
+  FROM app_bi.hexagon.vdim_user vu
+  JOIN app_merch_growth.public.dim_am_ownership dao ON vu.MERCHANT_TOKEN = dao.MERCHANT_TOKEN
+  WHERE dao.BUSINESS_ID = '<BUSINESS_ID>'
+    AND vu.IS_CURRENTLY_DEACTIVATED = 0
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY dao.BUSINESS_ID ORDER BY vu.MERCHANT_LATEST_PAYMENT_DATE DESC NULLS LAST) = 1
+  ```
+
+  ### 2b. Product Adoption
+  ```sql
+  SELECT
+    COALESCE(mpe.PRODUCT_PARENT_NAME, mpe.PRODUCT_NAME) AS product,
+    MIN(mpe.EARLIEST_PRODUCT_REVENUE_EVENT_DATE) AS first_used,
+    MAX(mpe.RECENT_PRODUCT_REVENUE_EVENT_DATE) AS last_used
+  FROM app_sales.app_sales_etl.merchant_product_events mpe
+  JOIN app_merch_growth.public.dim_am_ownership dao ON mpe.MERCHANT_TOKEN = dao.MERCHANT_TOKEN
+  WHERE dao.BUSINESS_ID = '<BUSINESS_ID>'
+  GROUP BY 1
+  ORDER BY last_used DESC
+  ```
+
+  ### 2c. Recent AM Activities (last 6 months)
+  ```sql
+  SELECT
+    act.ACTIVITY_DATE,
+    act.ACTIVITY_TYPE_GROUPED,
+    act.SUBJECT,
+    act.CALL_OUTCOME,
+    act.IS_DM,
+    ROUND(act.CALL_DURATION_SECONDS / 60, 1) AS call_mins,
+    act.OWNER_NAME
+  FROM app_merch_growth.app_merch_growth_etl.am_fact_activities act
+  WHERE act.BUSINESS_ID = '<BUSINESS_ID>'
+    AND act.ACTIVITY_DATE >= DATEADD('month', -6, CURRENT_DATE())
+    AND act.ACTIVITY_TYPE_GROUPED IN ('Call', 'Email', 'SMS', 'Field Visit', 'Google Meet', 'Slack')
+  ORDER BY act.ACTIVITY_DATE DESC
+  LIMIT 20
+  ```
+
+  ### 2d. Gong Call Summaries (the gold — last 12 months)
+  ```sql
+  SELECT
+    gc.METADATA_STARTED::DATE AS call_date,
+    gc.METADATA_TITLE,
+    ROUND(gc.METADATA_DURATION / 60, 1) AS duration_mins,
+    gc.CONTENT_BRIEF AS call_summary,
+    gc.CONTENT_HIGHLIGHTS AS highlights,
+    gc.CONTENT_POINTSOFINTEREST_ACTIONITEMS AS action_items,
+    gc.CONTENT_KEYPOINTS AS key_points,
+    gc.CONTENT_TOPICS AS topics,
+    gc.CONTENT_CALLOUTCOME AS outcome
+  FROM app_sales.gong.gong_detailed_calls gc
+  WHERE gc.METADATA_ID IN (
+    SELECT DISTINCT act.SFDC_OBJECT_ID
+    FROM app_merch_growth.app_merch_growth_etl.am_fact_activities act
+    WHERE act.BUSINESS_ID = '<BUSINESS_ID>'
+      AND act.ACTIVITY_DATE >= DATEADD('month', -12, CURRENT_DATE())
+  )
+     OR gc.METADATA_TITLE ILIKE '%<BUSINESS_NAME>%'
+  ORDER BY gc.METADATA_STARTED DESC
+  LIMIT 10
+  ```
+
+  If the join via SFDC_OBJECT_ID returns no Gong results, try joining through the
+  SFDC Account ID:
+  ```sql
+  SELECT
+    gconv.GONG_CALL_START::DATE AS call_date,
+    gconv.GONG_TITLE,
+    ROUND(gconv.GONG_CALL_DURATION_SEC / 60, 1) AS duration_mins,
+    gconv.GONG_TALK_TIME_US AS rep_talk_secs,
+    gconv.GONG_TALK_TIME_THEM AS customer_talk_secs,
+    gc.CONTENT_BRIEF,
+    gc.CONTENT_HIGHLIGHTS
+  FROM app_sales.app_salesforce.gong_conversations gconv
+  LEFT JOIN app_sales.gong.gong_detailed_calls gc
+    ON gconv.GONG_CALL_ID = gc.CALL_ID::TEXT
+  WHERE gconv.GONG_PRIMARY_ACCOUNT = '<SFDC_ACCOUNT_ID>'
+     OR gconv.RELATED_ACCOUNT_1 = '<SFDC_ACCOUNT_ID>'
+     OR gconv.RELATED_ACCOUNT_2 = '<SFDC_ACCOUNT_ID>'
+  ORDER BY gconv.GONG_CALL_START DESC
+  LIMIT 10
+  ```
+
+  ### 2e. CS Support Cases (last 12 months)
+  ```sql
+  SELECT
+    sc.CASE_CREATED_AT::DATE AS case_date,
+    sc.CASE_STATUS,
+    sc.ISSUE,
+    sc.MACRO_LABEL AS category,
+    sc.CASE_GROUP_NAME AS team
+  FROM app_merch_growth.app_merch_growth_etl.support_case_list sc
+  WHERE sc.MERCHANT_TOKEN IN (
+    SELECT dao.MERCHANT_TOKEN
+    FROM app_merch_growth.public.dim_am_ownership dao
+    WHERE dao.BUSINESS_ID = '<BUSINESS_ID>'
+  )
+    AND sc.CASE_CREATED_AT >= DATEADD('month', -12, CURRENT_DATE())
+  ORDER BY sc.CASE_CREATED_AT DESC
+  LIMIT 15
+  ```
+
+  ### 2f. Churn Risk Score (if available)
+  ```sql
+  SELECT
+    cpw.PRED_PROB AS churn_probability,
+    cpw.OUTREACH_PRIORITY_RANK,
+    cpw.LAST_90D_GPV,
+    cpw.LATEST_CSAT
+  FROM app_support.databricks_ml.churn_predictions_winback cpw
+  WHERE cpw.MERCHANT_TOKEN IN (
+    SELECT dao.MERCHANT_TOKEN
+    FROM app_merch_growth.public.dim_am_ownership dao
+    WHERE dao.BUSINESS_ID = '<BUSINESS_ID>'
+  )
+  ORDER BY cpw.PRED_PROB DESC
+  LIMIT 1
+  ```
+
+  ### 2g. GPV Trend (quarterly, last 4 quarters)
+  ```sql
+  SELECT
+    gpv.OWNERSHIP_QTR,
+    SUM(gpv.GPV_LP) AS gpv_current,
+    SUM(gpv.GPV_LP_PRIOR_PERIOD) AS gpv_prior_period,
+    SUM(gpv.GPV_LP_PRIOR_YEAR) AS gpv_prior_year
+  FROM am_analytics.am_analytics_etl.smb_varcomp_gpv gpv
+  WHERE gpv.BUSINESS_ID = '<BUSINESS_ID>'
+  GROUP BY 1
+  ORDER BY 1 DESC
+  LIMIT 4
+  ```
+
+  ## STEP 3: GENERATE THE ONE-PAGER
+
+  Format the output as a clean, structured briefing document using this template:
+
+  ```markdown
+  # 🏢 [BUSINESS NAME] — Seller One-Pager
+  **Generated:** [today's date] | **AM:** [AM name] | **SFDC:** [link]
+
+  ---
+
+  ## Business Snapshot
+  | | |
+  |---|---|
+  | **Category** | [category] |
+  | **Location** | [city, state postcode] |
+  | **Active Locations** | [count] |
+  | **Tenure** | [X years/months] with Square |
+  | **Service Level** | [level] |
+  | **Contract** | [Yes/No] |
+  | **Churn Risk** | [Low/Medium/High — X% probability] |
+
+  ## GPV & Revenue
+  | Period | GPV | vs Prior Period | vs Prior Year |
+  |--------|-----|-----------------|---------------|
+  | [Q] | $X | +/-X% | +/-X% |
+
+  ## Products ([count] active)
+  [List products with first-used dates. Flag any not used in 90+ days.]
+
+  ## 📞 Communication History
+
+  ### Conversation Summary
+  [Synthesize ALL Gong call summaries into a coherent narrative. What themes keep
+  coming up? What has the seller asked about? What was promised? What concerns
+  were raised? This should read like a briefing, not a list of calls.]
+
+  ### Key Points from Recent Calls
+  - [Bullet the most important takeaways across all calls]
+  - [Focus on: what the seller cares about, what was promised, unresolved issues]
+
+  ### Action Items (from calls)
+  - [Any outstanding action items from Gong]
+
+  ### Activity Timeline (last 6 months)
+  | Date | Type | Outcome | Notes |
+  |------|------|---------|-------|
+  | [date] | [Call/Email/SMS] | [DM/VM/No Contact] | [subject excerpt] |
+
+  ## 🎧 Support History
+  [Summarize: X cases in last 12 months. List any open cases. Note patterns
+  (e.g., "3 cases about terminals in Nov — may have hardware issues")]
+
+  ## 💡 Recommended Talking Points
+  Based on everything above, here are 3-5 specific things to bring up:
+  1. [Reference a specific past conversation or promise]
+  2. [Address any open support issues]
+  3. [Product opportunity based on gaps]
+  4. [Acknowledge a milestone or positive trend]
+  5. [Address any risk signals]
+
+  ---
+  *Generated by Seller Intelligence Platform — data from Snowflake as of [date]*
+  ```
+
+  ## IMPORTANT RULES
+
+  1. **Conversation Summary is the most valuable section.** Don't just list calls —
+     synthesize them into a narrative. "Over the last 6 months, the team has had 4
+     conversations with Bromley's. The main themes have been their expansion to a
+     6th location (discussed in Oct and Dec), concerns about 3P delivery integration
+     (raised in Nov, resolved in Jan), and interest in Loyalty (mentioned twice but
+     not yet adopted)."
+
+  2. **If Gong data is unavailable**, say so clearly and rely on the activity log
+     subjects/outcomes instead. Still synthesize — don't just dump raw data.
+
+  3. **Always include the SFDC link** so the AM can jump straight to the account.
+
+  4. **Talking points should reference specific data.** Not "discuss product adoption"
+     but "Last call on Feb 12, Sarah mentioned interest in Loyalty — follow up on that."
+
+  5. **Flag anything concerning:** open support cases, declining GPV, high churn
+     probability, long gaps in contact, promises made but not followed up on.
+
+  6. **Keep it scannable.** An AM should be able to read this in 60 seconds and
+     feel prepared for the call.
+
+  7. **AU SMB context:** Currency is AUD. Filter to AM_TEAM = 'AU SMB' where applicable.
+     Use standardized UDFs for date ranges where available.
