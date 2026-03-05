@@ -2162,7 +2162,7 @@ function toggleRiskLegend() {
 
 // ===== SELLER ONE-PAGER =====
 function copyOnePagerPrompt(sellerName, sfdcId) {
-  var prompt = "Load the file recipes/seller-one-pager.yaml then generate a one-pager for " + sellerName;
+  var prompt = "Load the recipe from https://raw.githubusercontent.com/mbrown-sq/am-portfolio-dashboard/main/recipes/seller-one-pager.yaml then generate a one-pager for " + sellerName;
   if (sfdcId) prompt += " (SFDC: " + sfdcId + ")";
   if (navigator.clipboard) {
     navigator.clipboard.writeText(prompt).then(function() {
