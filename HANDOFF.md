@@ -145,6 +145,14 @@ Single-file app. No build step, no dependencies beyond CDN fonts/icons.
 - `function renderCategoryChart()` — GPV by category panel
 - `function populateAMSelect()` — Dynamic AM dropdown
 
+### `recipes/seller-one-pager.yaml` — Seller One-Pager recipe
+Generates a comprehensive seller briefing by querying Snowflake for activities, Gong call summaries,
+CS cases, products, GPV trends, and churn risk. Triggered from the dashboard via the "Seller One-Pager" button.
+
+### `docs/` — Documentation
+- `seller_intelligence_platform.md` — Full platform overview doc (features, benefits, Code Red alignment, GTM alignment)
+- `example_one_pager_huamoom.md` — Example one-pager output for Huamoom Thai Market
+
 ### `recipes/seller-signals-agent.yaml` — Goose data agent recipe
 A comprehensive Goose recipe that can answer AM questions by querying Snowflake in real-time.
 Covers 25+ data tables across seller signals and AM performance metrics.
@@ -324,6 +332,24 @@ load the file /Users/mbrown/Projects/am-portfolio-dashboard/recipes/seller-signa
 "I'm an AU SMB AM with LDAP 'antony'. Show me my sellers with highest churn risk."
 ```
 
+### Seller One-Pager ✅ (built 2026-03-05)
+**File:** `recipes/seller-one-pager.yaml`
+**Status:** Built and committed. Accessible from seller detail modal via "Seller One-Pager" button.
+
+Generates a comprehensive briefing document for any seller by pulling live data from Snowflake:
+- **Business snapshot** — location, tenure, service level, contract, churn risk score
+- **GPV trends** — quarterly with period-over-period and YoY comparisons
+- **Product adoption** — every product with first/last used dates, dormant flags
+- **Communication history** — synthesised narrative from AM_FACT_ACTIVITIES (calls, emails, SMS)
+- **Gong call summaries** — AI-generated briefs, highlights, action items from GONG_DETAILED_CALLS
+- **CS support cases** — from SUPPORT_CASE_LIST, patterns and open cases
+- **Churn risk** — ML probability from CHURN_PREDICTIONS_WINBACK
+- **Recommended talking points** — 3-5 specific, data-backed conversation starters
+
+**How it works:** AM clicks "Seller One-Pager" in modal → prompt copied to clipboard with seller name + SFDC ID → paste into Goose → full briefing generates from live Snowflake data. Uses GitHub raw URL so any AM with Goose can use it.
+
+**Key data tables:** AM_FACT_ACTIVITIES, GONG_DETAILED_CALLS, GONG_CONVERSATIONS, SUPPORT_CASE_LIST, MERCHANT_PRODUCT_EVENTS, SMB_VARCOMP_GPV, CHURN_PREDICTIONS_WINBACK, AM_FACT_ACCOUNT_OWNERSHIP_V2, VDIM_USER
+
 ### Phase 2: Embedded Chat Widget (needs infrastructure)
 Requires:
 - **Blockcell** or **GCP Cloud Function** for the backend (to keep API keys server-side)
@@ -388,6 +414,11 @@ Future: Real-time event-based updates via the GTM Unified Data Layer (see GTM Au
 | Salesforce direct links | `squareinc.lightning.force.com/lightning/r/Account/{sf}/view` | sf field |
 | **Goose data agent recipe** | `recipes/seller-signals-agent.yaml` | 25+ Snowflake tables |
 | **Data Agent launcher panel** | `toggleAgentPanel()` / `copyAgentQ()` / `copyRecipeCmd()` — floating FAB button (bottom-right) | Recipe example questions, copy-to-clipboard, data coverage tags, roadmap |
+| **Seller One-Pager button** | `copyOnePagerPrompt()` — in seller modal action bar | Copies Goose prompt with seller name + SFDC ID to clipboard |
+| **Seller One-Pager recipe** | `recipes/seller-one-pager.yaml` | AM activities, Gong call summaries, CS cases, products, GPV, churn risk |
+| **GPV by Risk Status** | `renderGPVChart()` (AM view branch) | Stacked bar showing AM's GPV split across Healthy/Watch/At-Risk |
+| **Risk status legend** | `toggleRiskLegend()` — info button on GPV panel | Explains Healthy/Watch/At-Risk criteria with health score context |
+| **Risk reason tooltips** | `riskReason(a)` — title attribute on risk badges | Hover to see why: GPV trend, contact recency, products, contract |
 
 ---
 
@@ -403,7 +434,8 @@ Future: Real-time event-based updates via the GTM Unified Data Layer (see GTM Au
 8. **CSS variables** are at the top of the file (`:root { --bg: #0f1923; ... }`) — change theme here
 9. **To update the Goose recipe:** Edit `recipes/seller-signals-agent.yaml` — add new tables, query patterns, or advisory actions
 10. **To edit the Data Agent panel:** Search for `<!-- DATA AGENT -->` in the HTML or `DATA AGENT PANEL` in the JS. The FAB button is `#agentFab`, the slide-up panel is `#agentPanel`. Example questions are `agent-question-btn` buttons.
-11. **For comp accuracy:** Always reference [go/AMCompHub](https://www.notion.so/square-seller/AM-Comp-SMB-Metrics-Explainer-27f70293beed80bba328ff2c653a614c) — contract multiplier is 1.1x on **in-quarter** GPV and AR (quarterly, not annual)
+11. **To edit the Seller One-Pager recipe:** Edit `recipes/seller-one-pager.yaml` — add new data queries, change the output format, or add sections
+12. **For comp accuracy:** Always reference [go/AMCompHub](https://www.notion.so/square-seller/AM-Comp-SMB-Metrics-Explainer-27f70293beed80bba328ff2c653a614c) — contract multiplier is 1.1x on **in-quarter** GPV and AR (quarterly, not annual)
 
 ---
 
@@ -417,4 +449,11 @@ Future: Real-time event-based updates via the GTM Unified Data Layer (see GTM Au
 | `4eefd66` | 2026-03-05 | **Retention Intelligence rewrite** — 5-section seller-outcome-focused framing, saasAr mapping, comp-accurate contract multiplier |
 | `1e4ad86` | 2026-03-05 | **Goose data agent recipe** |
 | `088b3d7` | 2026-03-05 | **STRATEGY.md update** — reflects Retention Intelligence rewrite, Data Agent recipe, updated 6-phase roadmap |
-| `6dc5298` | 2026-03-05 | **Data Agent launcher panel** — floating FAB button with example questions, recipe copy, data coverage, roadmap
+| `6dc5298` | 2026-03-05 | **Data Agent launcher panel** — floating FAB button with example questions, recipe copy, data coverage, roadmap |
+| `2693ba3` | 2026-03-05 | **GPV panel** — team trend for All AMs, GPV by Risk Status breakdown for individual AM views |
+| `4049b3b` | 2026-03-05 | **Risk status legend** — info button on AM GPV panel explains Healthy/Watch/At Risk with health score context |
+| `e78206a` | 2026-03-05 | **Risk reason tooltips** — hover any risk badge to see why (GPV trend, contact recency, products, contract) |
+| `077dc27` | 2026-03-05 | **Seller One-Pager** — Goose recipe (activities, Gong summaries, CS cases, products, GPV) + button in seller modal |
+| `34f6c2e` | 2026-03-05 | Seller One-Pager: use GitHub raw URL so any AM with Goose can use it |
+| `188bf58` | 2026-03-05 | Fix alerts panel — fill available height, no dead space |
+| `679d06a` | 2026-03-05 | Match alerts panel height to portfolio table
