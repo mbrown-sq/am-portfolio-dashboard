@@ -107,6 +107,7 @@ const DATA = {
 | `pc` | Postcode | Snowflake: VDIM_USER |
 | `svc` | AM Service Level | Snowflake: AM_FACT_ACCOUNT_OWNERSHIP_V2 |
 | `cls` | Seller Class | Snowflake: AM_FACT_ACCOUNT_OWNERSHIP_V2 |
+| `bid` | Business ID (primary key for all AM Snowflake tables) | Snowflake: AM_FACT_ACCOUNT_OWNERSHIP_V2 |
 
 **Feature News format** (in `data.js` → `DATA.featureNews`):
 ```javascript
@@ -332,9 +333,9 @@ load the file /Users/mbrown/Projects/am-portfolio-dashboard/recipes/seller-signa
 "I'm an AU SMB AM with LDAP 'antony'. Show me my sellers with highest churn risk."
 ```
 
-### Seller One-Pager ✅ (built 2026-03-05)
-**File:** `recipes/seller-one-pager.yaml`
-**Status:** Built and committed. Accessible from seller detail modal via "Seller One-Pager" button.
+### Seller One-Pager ✅ (built 2026-03-05, updated 2026-03-06)
+**File:** `recipes/seller-one-pager.yaml` (reference copy), logic embedded in `index.html` → `copyOnePagerPrompt()`
+**Status:** Self-contained — works for any AM with Goose + Snowflake access. No local files required.
 
 Generates a comprehensive briefing document for any seller by pulling live data from Snowflake:
 - **Business snapshot** — location, tenure, service level, contract, churn risk score
@@ -346,7 +347,13 @@ Generates a comprehensive briefing document for any seller by pulling live data 
 - **Churn risk** — ML probability from CHURN_PREDICTIONS_WINBACK
 - **Recommended talking points** — 3-5 specific, data-backed conversation starters
 
-**How it works:** AM clicks "Seller One-Pager" in modal → prompt copied to clipboard with seller name + SFDC ID → paste into Goose → full briefing generates from live Snowflake data. Uses GitHub raw URL so any AM with Goose can use it.
+**How it works (updated 2026-03-06):** AM clicks "Seller One-Pager" in modal → **full self-contained prompt** copied to clipboard (includes all SQL queries with the seller's BUSINESS_ID pre-filled, output format instructions, and rules) → paste into Goose → full briefing generates from live Snowflake data. **No recipe file loading required** — the prompt is entirely self-contained, so any AM with Goose and Snowflake access can use it.
+
+**Key changes (2026-03-06):**
+- Added `bid` (Business ID) field to all 1,728/1,729 accounts in `data.js` — pulled from `AM_FACT_ACCOUNT_OWNERSHIP_V2` and `SFDC_ACCOUNT_RAW_TEMP`
+- One-pager button now uses BUSINESS_ID as primary key in all queries (more reliable than name matching)
+- Prompt is fully self-contained — no dependency on loading a recipe from a GitHub URL or local file
+- All 7 SQL queries are embedded in the copied prompt with the seller's BUSINESS_ID pre-filled
 
 **Key data tables:** AM_FACT_ACTIVITIES, GONG_DETAILED_CALLS, GONG_CONVERSATIONS, SUPPORT_CASE_LIST, MERCHANT_PRODUCT_EVENTS, SMB_VARCOMP_GPV, CHURN_PREDICTIONS_WINBACK, AM_FACT_ACCOUNT_OWNERSHIP_V2, VDIM_USER
 
@@ -414,7 +421,7 @@ Future: Real-time event-based updates via the GTM Unified Data Layer (see GTM Au
 | Salesforce direct links | `squareinc.lightning.force.com/lightning/r/Account/{sf}/view` | sf field |
 | **Goose data agent recipe** | `recipes/seller-signals-agent.yaml` | 25+ Snowflake tables |
 | **Data Agent launcher panel** | `toggleAgentPanel()` / `copyAgentQ()` / `copyRecipeCmd()` — floating FAB button (bottom-right) | Recipe example questions, copy-to-clipboard, data coverage tags, roadmap |
-| **Seller One-Pager button** | `copyOnePagerPrompt()` — in seller modal action bar | Copies Goose prompt with seller name + SFDC ID to clipboard |
+| **Seller One-Pager button** | `copyOnePagerPrompt()` — in seller modal action bar | Copies self-contained Goose prompt with BUSINESS_ID, all SQL queries, and output format to clipboard |
 | **Seller One-Pager recipe** | `recipes/seller-one-pager.yaml` | AM activities, Gong call summaries, CS cases, products, GPV, churn risk |
 | **GPV by Risk Status** | `renderGPVChart()` (AM view branch) | Stacked bar showing AM's GPV split across Healthy/Watch/At-Risk |
 | **Risk status legend** | `toggleRiskLegend()` — info button on GPV panel | Explains Healthy/Watch/At-Risk criteria with health score context |

@@ -790,7 +790,8 @@ const accounts = DATA.accounts.map(a => ({
   products: a.products ? a.products.split(',') : [],
   city: a.city || '', state: a.state || '', postcode: a.pc || '',
   serviceLevel: a.svc || '', sellerClass: a.cls || '',
-  saasAr: a.sar || 0
+  saasAr: a.sar || 0,
+  bid: a.bid || ''
 }));
 
 // Map alerts from DATA.alerts
@@ -1988,7 +1989,7 @@ function toggleDetail(idx) {
       // Action buttons
       '<div style="display:flex;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid var(--border);flex-wrap:wrap;">' +
         '<a class="detail-btn" href="' + sfUrl + '" target="_blank"><i class="fas fa-external-link-alt"></i>View in Salesforce</a>' +
-        '<button class="onepager-btn" onclick="copyOnePagerPrompt(\'' + a.name.replace(/'/g, "\\'") + '\', \'' + (a.sf||'') + '\')" title="Copy a Goose prompt to generate a full seller briefing"><i class="fas fa-file-alt"></i>Seller One-Pager</button>' +
+        '<button class="onepager-btn" onclick="copyOnePagerPrompt(\'' + a.name.replace(/'/g, "\\'") + '\', \'' + (a.sf||'') + '\', \'' + (a.bid||'') + '\')" title="Copy a Goose prompt to generate a full seller briefing"><i class="fas fa-file-alt"></i>Seller One-Pager</button>' +
         '<a class="detail-btn secondary" href="#"><i class="fas fa-plus-circle"></i>Log Activity</a>' +
         '<button class="detail-btn secondary" onclick="closeModal()" style="margin-left:auto;"><i class="fas fa-times"></i>Close</button>' +
       '</div>' +
@@ -2161,9 +2162,159 @@ function toggleRiskLegend() {
 }
 
 // ===== SELLER ONE-PAGER =====
-function copyOnePagerPrompt(sellerName, sfdcId) {
-  var prompt = "Load the recipe from https://raw.githubusercontent.com/mbrown-sq/am-portfolio-dashboard/main/recipes/seller-one-pager.yaml then generate a one-pager for " + sellerName;
-  if (sfdcId) prompt += " (SFDC: " + sfdcId + ")";
+function copyOnePagerPrompt(sellerName, sfdcId, businessId) {
+  var sellerIdLine = "Seller: " + sellerName;
+  if (businessId) sellerIdLine += " | BUSINESS_ID: " + businessId;
+  if (sfdcId) sellerIdLine += " | SFDC: " + sfdcId;
+
+  // Use BUSINESS_ID as primary key in all queries; fall back to SFDC name match
+  var bidFilter = businessId
+    ? "dao.BUSINESS_ID = '" + businessId + "'"
+    : "LOWER(aeo.BUSINESS_NAME) LIKE LOWER('%" + sellerName.replace(/'/g, "''") + "%')";
+  var bidFilterDirect = businessId
+    ? "act.BUSINESS_ID = '" + businessId + "'"
+    : "LOWER(act.BUSINESS_NAME) LIKE LOWER('%" + sellerName.replace(/'/g, "''") + "%')";
+  var bidFilterGpv = businessId
+    ? "gpv.BUSINESS_ID = '" + businessId + "'"
+    : "1=0 /* no BUSINESS_ID available — search by name in Step 1 first */";
+
+  var prompt = [
+    "Generate a Seller One-Pager for an AU SMB seller. You are a seller briefing generator for AU SMB Account Managers.",
+    "",
+    sellerIdLine,
+    "",
+    "## STEP 1: IDENTIFY THE SELLER",
+    "",
+    "```sql",
+    "SELECT",
+    "  aeo.BUSINESS_NAME, aeo.BUSINESS_ID,",
+    "  aeo.AM_SERVICE_LEVEL, aeo.SELLER_CLASS,",
+    "  ame.FIRST_NAME || ' ' || ame.LAST_NAME AS AM_NAME, ame.LDAP AS AM_LDAP",
+    "FROM app_merch_growth.app_merch_growth_etl.am_fact_account_ownership_v2 aeo",
+    "JOIN app_merch_growth.app_merch_growth_etl.am_fact_employment_current ame",
+    "  ON aeo.ACTIVE_OWNER_ID = ame.SFDC_OWNER_ID",
+    "WHERE ame.AM_TEAM = 'AU SMB' AND aeo.IS_ACTIVELY_MANAGED = 1",
+    "  AND aeo.BUSINESS_ID = '" + (businessId || "FILL_FROM_RESULTS") + "'",
+    "```",
+    "",
+    "Store the BUSINESS_ID for all subsequent queries.",
+    "",
+    "## STEP 2: PULL ALL DATA (run in parallel where possible)",
+    "",
+    "### 2a. Location",
+    "```sql",
+    "SELECT vu.RECEIPT_CITY, vu.RECEIPT_STATE, vu.RECEIPT_POSTAL_CODE,",
+    "  COUNT(DISTINCT CASE WHEN vu.IS_UNIT=1 AND vu.UNIT_ACTIVE_STATUS=TRUE THEN vu.BEST_AVAILABLE_UNIT_TOKEN END) AS active_locations",
+    "FROM app_bi.hexagon.vdim_user vu",
+    "JOIN app_merch_growth.public.dim_am_ownership dao ON vu.MERCHANT_TOKEN = dao.MERCHANT_TOKEN",
+    "WHERE " + bidFilter + " AND vu.IS_CURRENTLY_DEACTIVATED = 0",
+    "QUALIFY ROW_NUMBER() OVER (PARTITION BY dao.BUSINESS_ID ORDER BY vu.MERCHANT_LATEST_PAYMENT_DATE DESC NULLS LAST) = 1",
+    "```",
+    "",
+    "### 2b. Products",
+    "```sql",
+    "SELECT COALESCE(mpe.PRODUCT_PARENT_NAME, mpe.PRODUCT_NAME) AS product,",
+    "  MIN(mpe.EARLIEST_PRODUCT_REVENUE_EVENT_DATE) AS first_used,",
+    "  MAX(mpe.RECENT_PRODUCT_REVENUE_EVENT_DATE) AS last_used",
+    "FROM app_sales.app_sales_etl.merchant_product_events mpe",
+    "JOIN app_merch_growth.public.dim_am_ownership dao ON mpe.MERCHANT_TOKEN = dao.MERCHANT_TOKEN",
+    "WHERE " + bidFilter,
+    "GROUP BY 1 ORDER BY last_used DESC",
+    "```",
+    "",
+    "### 2c. AM Activities (last 6 months)",
+    "```sql",
+    "SELECT act.ACTIVITY_DATE, act.ACTIVITY_TYPE_GROUPED, act.SUBJECT,",
+    "  act.CALL_OUTCOME, act.IS_DM, ROUND(act.CALL_DURATION_SECONDS/60,1) AS call_mins, act.OWNER_NAME",
+    "FROM app_merch_growth.app_merch_growth_etl.am_fact_activities act",
+    "WHERE " + bidFilterDirect,
+    "  AND act.ACTIVITY_DATE >= DATEADD('month', -6, CURRENT_DATE())",
+    "  AND act.ACTIVITY_TYPE_GROUPED IN ('Call','Email','SMS','Field Visit','Google Meet','Slack')",
+    "ORDER BY act.ACTIVITY_DATE DESC LIMIT 20",
+    "```",
+    "",
+    "### 2d. Gong Call Summaries (last 12 months)",
+    "```sql",
+    "SELECT gc.METADATA_STARTED::DATE AS call_date, gc.METADATA_TITLE,",
+    "  ROUND(gc.METADATA_DURATION/60,1) AS duration_mins, gc.CONTENT_BRIEF AS call_summary,",
+    "  gc.CONTENT_HIGHLIGHTS AS highlights, gc.CONTENT_POINTSOFINTEREST_ACTIONITEMS AS action_items,",
+    "  gc.CONTENT_KEYPOINTS AS key_points, gc.CONTENT_TOPICS AS topics, gc.CONTENT_CALLOUTCOME AS outcome",
+    "FROM app_sales.gong.gong_detailed_calls gc",
+    "WHERE gc.METADATA_ID IN (",
+    "  SELECT DISTINCT act.SFDC_OBJECT_ID FROM app_merch_growth.app_merch_growth_etl.am_fact_activities act",
+    "  WHERE " + bidFilterDirect + " AND act.ACTIVITY_DATE >= DATEADD('month',-12,CURRENT_DATE())",
+    ") OR gc.METADATA_TITLE ILIKE '%" + sellerName.replace(/'/g, "''") + "%'",
+    "ORDER BY gc.METADATA_STARTED DESC LIMIT 10",
+    "```",
+    "If no Gong results, try via SFDC Account ID:" + (sfdcId ? "" : " (not available for this seller)"),
+    sfdcId ? [
+      "```sql",
+      "SELECT gconv.GONG_CALL_START::DATE AS call_date, gconv.GONG_TITLE,",
+      "  ROUND(gconv.GONG_CALL_DURATION_SEC/60,1) AS duration_mins,",
+      "  gc.CONTENT_BRIEF, gc.CONTENT_HIGHLIGHTS",
+      "FROM app_sales.app_salesforce.gong_conversations gconv",
+      "LEFT JOIN app_sales.gong.gong_detailed_calls gc ON gconv.GONG_CALL_ID = gc.CALL_ID::TEXT",
+      "WHERE gconv.GONG_PRIMARY_ACCOUNT = '" + sfdcId + "'",
+      "   OR gconv.RELATED_ACCOUNT_1 = '" + sfdcId + "'",
+      "   OR gconv.RELATED_ACCOUNT_2 = '" + sfdcId + "'",
+      "ORDER BY gconv.GONG_CALL_START DESC LIMIT 10",
+      "```"
+    ].join("\n") : "",
+    "",
+    "### 2e. CS Support Cases (last 12 months)",
+    "```sql",
+    "SELECT sc.CASE_CREATED_AT::DATE AS case_date, sc.CASE_STATUS, sc.ISSUE,",
+    "  sc.MACRO_LABEL AS category, sc.CASE_GROUP_NAME AS team",
+    "FROM app_merch_growth.app_merch_growth_etl.support_case_list sc",
+    "WHERE sc.MERCHANT_TOKEN IN (",
+    "  SELECT dao.MERCHANT_TOKEN FROM app_merch_growth.public.dim_am_ownership dao",
+    "  WHERE " + bidFilter,
+    ") AND sc.CASE_CREATED_AT >= DATEADD('month',-12,CURRENT_DATE())",
+    "ORDER BY sc.CASE_CREATED_AT DESC LIMIT 15",
+    "```",
+    "",
+    "### 2f. Churn Risk",
+    "```sql",
+    "SELECT cpw.PRED_PROB AS churn_probability, cpw.OUTREACH_PRIORITY_RANK,",
+    "  cpw.LAST_90D_GPV, cpw.LATEST_CSAT",
+    "FROM app_support.databricks_ml.churn_predictions_winback cpw",
+    "WHERE cpw.MERCHANT_TOKEN IN (",
+    "  SELECT dao.MERCHANT_TOKEN FROM app_merch_growth.public.dim_am_ownership dao",
+    "  WHERE " + bidFilter,
+    ") ORDER BY cpw.PRED_PROB DESC LIMIT 1",
+    "```",
+    "",
+    "### 2g. GPV Trend (quarterly, last 4 quarters)",
+    "```sql",
+    "SELECT gpv.OWNERSHIP_QTR, SUM(gpv.GPV_LP) AS gpv_current,",
+    "  SUM(gpv.GPV_LP_PRIOR_PERIOD) AS gpv_prior_period,",
+    "  SUM(gpv.GPV_LP_PRIOR_YEAR) AS gpv_prior_year",
+    "FROM am_analytics.am_analytics_etl.smb_varcomp_gpv gpv",
+    "WHERE " + bidFilterGpv,
+    "GROUP BY 1 ORDER BY 1 DESC LIMIT 4",
+    "```",
+    "",
+    "## STEP 3: FORMAT AS ONE-PAGER",
+    "",
+    "Use this structure:",
+    "# 🏢 [BUSINESS NAME] — Seller One-Pager",
+    "**Generated:** [today] | **AM:** [name] | **SFDC:** [link]",
+    "",
+    "Sections: Business Snapshot (table), GPV & Revenue (quarterly table), Products (list with first-used dates, flag dormant 90d+),",
+    "📞 Communication History (synthesize ALL Gong summaries into a narrative — themes, promises, concerns — then key points, action items, activity timeline table),",
+    "🎧 Support History (summarize patterns, list open cases),",
+    "💡 Recommended Talking Points (3-5 specific, data-backed conversation starters referencing actual past calls/data).",
+    "",
+    "## RULES",
+    "1. Conversation Summary is the MOST VALUABLE section — synthesize, don't list.",
+    "2. If no Gong data, say so and use activity subjects instead.",
+    "3. Always include SFDC link: https://squareinc.lightning.force.com/lightning/r/Account/" + (sfdcId || "SFDC_ID") + "/view",
+    "4. Talking points must reference specific data — not generic advice.",
+    "5. Flag anything concerning: open cases, declining GPV, high churn prob, long contact gaps, broken promises.",
+    "6. Keep it scannable — AM reads in 60 seconds, picks up the phone.",
+    "7. Currency is AUD. Filter AM_TEAM = 'AU SMB' where applicable."
+  ].join("\n");
+
   if (navigator.clipboard) {
     navigator.clipboard.writeText(prompt).then(function() {
       var toast = document.createElement("div");
