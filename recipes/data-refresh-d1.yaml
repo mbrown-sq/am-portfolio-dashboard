@@ -1,0 +1,127 @@
+version: "1.0.0"
+title: "AU SMB Dashboard Data Refresh to D1"
+description: |
+  Refreshes the AU SMB Portfolio Dashboard by querying Snowflake and writing to D1 database.
+  Uses D1 for fast API access and also writes data.js as fallback.
+
+extensions:
+  - type: stdio
+    name: queryexpert
+    cmd: uvx
+    args:
+      - mcp_query_expert@latest
+    timeout: 600
+    bundled: true
+    description: "Query Snowflake data"
+  - type: builtin
+    name: developer
+    timeout: 300
+    bundled: true
+    description: "Read/write files and execute commands"
+
+prompt: "Run the AU SMB dashboard data refresh pipeline and write to D1"
+
+instructions: |
+  Execute the AU SMB dashboard data refresh pipeline and write results to D1 database.
+
+  ## SETUP
+  - Project root: /Users/mbrown/Projects/am-portfolio-dashboard
+  - Queries: queries/*.sql (10 files)
+  - API: https://am-portfolio-dashboard.vibeplatstage.squarecdn.com
+  - Output: D1 database + build/client/data.js (fallback)
+
+  ## EXECUTION STEPS
+
+  ### 1. Execute Queries
+  For each query file in queries/ (01-10), read the SQL and execute via queryexpert.
+  Store results in memory (do NOT write CSV files).
+
+  Query files:
+  - 01_accounts.sql → base account list
+  - 02_gpv.sql → GPV metrics (annualized, 9mo, YoY)
+  - 03_ar.sql → AR data
+  - 04_activity.sql → activity metrics
+  - 05_qtd_metrics.sql → QTD AM metrics
+  - 06_weekly_activity.sql → weekly activity (last 5 weeks)
+  - 07_gpv_trend.sql → GPV trend (last 6 months)
+  - 08_products.sql → product adoption
+  - 09_locations.sql → location data
+  - 10_contracts.sql → contract status
+
+  ### 2. Process Results
+  Use Python to join all results by BUSINESS_ID and compute:
+  
+  **Health score (h):**
+  ```python
+  h = min(100, max(0, round(
+    (50 if y > 0 else 30 if y > -10 else 10) +      # GPV velocity
+    (20 if d < 30 else 10 if d < 90 else 0) +       # Contact recency
+    (min(15, product_count * 3)) +                   # Product adoption
+    (10 if ct else 0) +                              # Contract
+    (min(5, tn / 12))                                # Tenure
+  )))
+  ```
+  
+  **Risk status (r):** "healthy" (h≥65), "watch" (h≥40), "at_risk" (h<40)
+  **GPV tier (t):** Tier 1 (g≥1.0M), Tier 2 (g≥0.3M), Tier 3 (g<0.3M)
+  **Days since DM (d):** DATEDIFF from last_dm_date, or 999 if null
+  **Category (c):** Infer from business name or default to "services"
+
+  ### 3. Generate Alerts
+  - Filter accounts where r="at_risk" AND g>0.1M
+  - Sort by health score (lowest first)
+  - Take top 30
+  - Generate contextual reasons:
+    * velocity < -15: "Significant decline in processing volume"
+    * days > 120: "No AM contact in {days} days"
+    * no products: "No add-on products adopted"
+    * locations > 1 and velocity < 0: "{locations} locations with declining GPV"
+
+  ### 4. Write to D1 Database
+  
+  Use Python with requests to write data via the D1 API:
+  
+  ```python
+  import requests
+  import json
+  
+  API_BASE = "https://am-portfolio-dashboard.vibeplatstage.squarecdn.com"
+  
+  # Clear existing data
+  requests.post(f"{API_BASE}/api/clear-data")
+  
+  # Insert accounts (batch insert)
+  for account in accounts:
+      # Insert via SQL or API endpoint
+      pass
+  
+  # Insert alerts
+  for alert in alerts:
+      pass
+  
+  # Insert other tables (qtd_metrics, weekly_activity, gpv_trend, am_summary, team_total)
+  ```
+  
+  **IMPORTANT:** The D1 database schema is already created. Just INSERT data.
+
+  ### 5. Write Fallback data.js
+  Also write to build/client/data.js for backward compatibility:
+  
+  ```python
+  with open("build/client/data.js", "w") as f:
+      f.write("const DATA = " + json.dumps(data, separators=(',', ':')) + ";")
+  ```
+
+  ### 6. Verify
+  - Check D1 has data: `curl {API_BASE}/api/summary`
+  - Check data.js size is 400KB-1MB
+  - Report total accounts, alerts, and API URL
+
+  ## IMPORTANT NOTES
+  - Currency: AUD (A$)
+  - AM_TEAM filter: 'AU SMB'
+  - IS_ACTIVELY_MANAGED = 1
+  - AM LDAP keys must be lowercase
+  - If any query fails, log error and continue
+  - Preserve featureNews array from existing data.js
+  - Do NOT deploy (deployment is separate step)

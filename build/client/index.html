@@ -1,0 +1,2375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AU SMB Portfolio Health Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+<style>
+:root {
+  --bg: #0f1923;
+  --bg2: #162231;
+  --bg3: #1c2d3f;
+  --bg4: #243a50;
+  --blue: #006AFF;
+  --blue-light: #338bff;
+  --blue-dim: rgba(0,106,255,0.15);
+  --green: #00c853;
+  --green-dim: rgba(0,200,83,0.15);
+  --yellow: #ffc107;
+  --yellow-dim: rgba(255,193,7,0.15);
+  --red: #ff3d57;
+  --red-dim: rgba(255,61,87,0.15);
+  --orange: #ff9800;
+  --text: #e8edf2;
+  --text2: #9bafc4;
+  --text3: #5e7a94;
+  --border: #1e3347;
+  --radius: 8px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); overflow-x:hidden; }
+::-webkit-scrollbar { width:6px; height:6px; }
+::-webkit-scrollbar-track { background:var(--bg2); }
+::-webkit-scrollbar-thumb { background:var(--bg4); border-radius:3px; }
+::-webkit-scrollbar-thumb:hover { background:var(--blue); }
+
+/* TOP BAR */
+.topbar {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 24px; background:var(--bg2); border-bottom:1px solid var(--border);
+  position:sticky; top:0; z-index:100;
+}
+.topbar-left h1 { font-size:16px; font-weight:700; color:var(--text); letter-spacing:-0.3px; }
+.topbar-left h1 span { color:var(--blue); }
+.topbar-left p { font-size:11px; color:var(--text3); margin-top:2px; }
+.topbar-right { display:flex; align-items:center; gap:12px; }
+.am-select {
+  background:var(--bg3); border:1px solid var(--border); color:var(--text);
+  padding:8px 14px; border-radius:var(--radius); font-size:12px; font-family:'Inter',sans-serif;
+  cursor:pointer; min-width:220px; outline:none;
+}
+.am-select:focus { border-color:var(--blue); }
+.am-select option { background:var(--bg2); }
+.badge-ramping {
+  font-size:9px; background:var(--blue-dim); color:var(--blue-light);
+  padding:2px 6px; border-radius:3px; font-weight:600;
+}
+.badge-leave {
+  font-size:9px; background:var(--red-dim); color:var(--red);
+  padding:2px 6px; border-radius:3px; font-weight:600;
+}
+
+/* KPI CARDS */
+.kpi-row {
+  display:grid; grid-template-columns:repeat(5,1fr); gap:12px;
+  padding:16px 24px;
+}
+.kpi-card {
+  background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius);
+  padding:16px; position:relative; overflow:hidden; transition:all .2s;
+}
+.kpi-card:hover { border-color:var(--blue); transform:translateY(-1px); }
+.kpi-card .kpi-label { font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.8px; font-weight:600; }
+.kpi-card .kpi-value { font-size:26px; font-weight:800; margin-top:6px; letter-spacing:-1px; }
+.kpi-card .kpi-sub { font-size:10px; color:var(--text3); margin-top:4px; }
+.kpi-card.blue .kpi-value { color:var(--blue-light); }
+.kpi-card.green .kpi-value { color:var(--green); }
+.kpi-card.red .kpi-value { color:var(--red); }
+.kpi-card.yellow .kpi-value { color:var(--yellow); }
+.kpi-card .kpi-icon {
+  position:absolute; right:12px; top:12px; font-size:20px; opacity:0.15;
+}
+.kpi-card.blue .kpi-icon { color:var(--blue); }
+.kpi-card.green .kpi-icon { color:var(--green); }
+.kpi-card.red .kpi-icon { color:var(--red); }
+.kpi-card.yellow .kpi-icon { color:var(--yellow); }
+.kpi-accent {
+  position:absolute; top:0; left:0; right:0; height:3px;
+}
+.kpi-card.blue .kpi-accent { background:var(--blue); }
+.kpi-card.green .kpi-accent { background:var(--green); }
+.kpi-card.red .kpi-accent { background:var(--red); }
+.kpi-card.yellow .kpi-accent { background:var(--yellow); }
+
+/* MAIN CONTENT */
+.main-content {
+  display:grid; grid-template-columns:60% 40%; gap:0;
+  padding:0 24px; min-height:0; align-items:stretch;
+}
+.panel {
+  background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius);
+  overflow:hidden;
+}
+.panel-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 16px; border-bottom:1px solid var(--border);
+}
+.panel-title { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; }
+.panel-title i { color:var(--blue); margin-right:6px; }
+
+/* TABLE PANEL */
+.table-panel { margin-right:6px; display:flex; flex-direction:column; height:100%; }
+.table-controls {
+  display:flex; align-items:center; gap:8px; padding:10px 16px;
+  border-bottom:1px solid var(--border); flex-wrap:wrap;
+}
+.search-box {
+  background:var(--bg3); border:1px solid var(--border); color:var(--text);
+  padding:6px 12px 6px 30px; border-radius:var(--radius); font-size:11px;
+  font-family:'Inter',sans-serif; outline:none; width:180px; position:relative;
+}
+.search-box:focus { border-color:var(--blue); }
+.search-wrap { position:relative; }
+.search-wrap i { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text3); font-size:11px; }
+.filter-btn {
+  background:var(--bg3); border:1px solid var(--border); color:var(--text2);
+  padding:5px 12px; border-radius:var(--radius); font-size:10px; cursor:pointer;
+  font-family:'Inter',sans-serif; font-weight:600; transition:all .15s;
+}
+.filter-btn:hover { border-color:var(--blue); color:var(--text); }
+.filter-btn.active { background:var(--blue-dim); border-color:var(--blue); color:var(--blue-light); }
+.filter-btn.risk-red.active { background:var(--red-dim); border-color:var(--red); color:var(--red); }
+.filter-btn.risk-yellow.active { background:var(--yellow-dim); border-color:var(--yellow); color:var(--yellow); }
+.filter-btn.risk-green.active { background:var(--green-dim); border-color:var(--green); color:var(--green); }
+
+.data-table { width:100%; border-collapse:collapse; }
+.data-table thead th {
+  position:sticky; top:0; z-index:10; background:var(--bg2);
+  font-size:9px; text-transform:uppercase; letter-spacing:0.8px; color:var(--text3);
+  padding:8px 10px; text-align:left; border-bottom:1px solid var(--border);
+  cursor:pointer; user-select:none; white-space:nowrap; font-weight:600;
+}
+.data-table thead th:hover { color:var(--blue-light); }
+.data-table thead th .sort-icon { margin-left:3px; font-size:8px; }
+.data-table tbody tr {
+  border-bottom:1px solid rgba(30,51,71,0.5); transition:background .15s;
+}
+.data-table tbody tr:hover { background:rgba(0,106,255,0.05); }
+.data-table tbody td { padding:7px 10px; font-size:11px; white-space:nowrap; }
+.cat-icon { width:22px; height:22px; border-radius:5px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; }
+.cat-food { background:rgba(255,152,0,0.15); color:var(--orange); }
+.cat-retail { background:var(--blue-dim); color:var(--blue-light); }
+.cat-beauty { background:rgba(233,30,99,0.15); color:#e91e63; }
+.cat-fitness { background:var(--green-dim); color:var(--green); }
+.cat-services { background:rgba(156,39,176,0.15); color:#ce93d8; }
+.cat-events { background:var(--yellow-dim); color:var(--yellow); }
+.cat-drinks { background:rgba(0,188,212,0.15); color:#00bcd4; }
+
+.gpv-badge {
+  font-size:9px; padding:2px 8px; border-radius:10px; font-weight:700;
+}
+.gpv-tier1 { background:rgba(0,106,255,0.2); color:var(--blue-light); }
+.gpv-tier2 { background:rgba(0,200,83,0.15); color:var(--green); }
+.gpv-tier3 { background:rgba(255,193,7,0.12); color:var(--yellow); }
+
+.yoy-pos { color:var(--green); }
+.yoy-neg { color:var(--red); }
+
+.health-bar-wrap { width:60px; height:6px; background:var(--bg); border-radius:3px; overflow:hidden; }
+.health-bar-fill { height:100%; border-radius:3px; transition:width .3s; }
+
+.risk-flag {
+  font-size:9px; padding:2px 8px; border-radius:10px; font-weight:700;
+}
+.risk-healthy { background:var(--green-dim); color:var(--green); }
+.risk-watch { background:var(--yellow-dim); color:var(--yellow); }
+.risk-at-risk { background:var(--red-dim); color:var(--red); }
+
+.table-scroll { flex:1; overflow-y:auto; max-height:500px; }
+.table-footer {
+  padding:8px 16px; border-top:1px solid var(--border);
+  font-size:10px; color:var(--text3); display:flex; justify-content:space-between;
+}
+
+/* ALERTS PANEL */
+.alerts-panel { margin-left:6px; display:flex; flex-direction:column; height:100%; }
+.alerts-scroll { flex:1; overflow-y:auto; padding:8px; min-height:0; }
+.alert-item {
+  background:var(--bg3); border:1px solid var(--border); border-left:3px solid var(--red);
+  border-radius:var(--radius); padding:10px 12px; margin-bottom:6px;
+  display:flex; align-items:flex-start; gap:10px; transition:all .2s;
+}
+.alert-item:hover { border-left-color:var(--orange); }
+.alert-item.dismissed { opacity:0.3; transform:scale(0.98); }
+.alert-icon { color:var(--red); font-size:14px; margin-top:2px; flex-shrink:0; }
+.alert-body { flex:1; min-width:0; }
+.alert-name { font-size:11px; font-weight:700; color:var(--text); }
+.alert-meta { font-size:10px; color:var(--text3); margin-top:2px; }
+.alert-meta span { color:var(--red); font-weight:600; }
+.alert-reason { font-size:10px; color:var(--yellow); margin-top:3px; }
+.alert-dismiss {
+  background:none; border:1px solid var(--border); color:var(--text3);
+  width:22px; height:22px; border-radius:50%; cursor:pointer; font-size:9px;
+  display:flex; align-items:center; justify-content:center; transition:all .15s;
+  flex-shrink:0;
+}
+.alert-dismiss:hover { border-color:var(--red); color:var(--red); background:var(--red-dim); }
+
+/* BOTTOM GRID */
+.bottom-grid {
+  display:grid; grid-template-columns:25% 25% 25% 25%; gap:12px;
+  padding:12px 24px 16px;
+}
+.bottom-grid .panel { min-height:0; }
+
+/* SVG CHART */
+.chart-container { padding:12px 16px; }
+svg text { font-family:'Inter',sans-serif; }
+
+/* ACTIVITY BARS */
+.activity-scroll { padding:10px 16px; max-height:220px; overflow-y:auto; }
+.activity-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.activity-label { font-size:10px; color:var(--text2); width:70px; text-align:right; flex-shrink:0; font-weight:500; }
+.activity-bar-wrap { flex:1; height:18px; background:var(--bg); border-radius:4px; overflow:hidden; display:flex; position:relative; }
+.activity-seg { height:100%; transition:width .3s; position:relative; }
+.activity-seg.calls { background:var(--blue); }
+.activity-seg.email { background:var(--green); }
+.activity-seg.sms { background:var(--orange); }
+.activity-total { font-size:10px; color:var(--text2); width:30px; text-align:right; font-weight:700; flex-shrink:0; }
+.activity-legend { display:flex; gap:14px; padding:8px 16px; border-top:1px solid var(--border); }
+.legend-item { display:flex; align-items:center; gap:4px; font-size:9px; color:var(--text3); }
+.legend-dot { width:8px; height:8px; border-radius:2px; }
+
+/* QTD TABLE */
+.qtd-scroll { padding:8px 12px; max-height:220px; overflow-y:auto; }
+.qtd-section { margin-bottom:10px; }
+.qtd-section-title {
+  font-size:9px; text-transform:uppercase; letter-spacing:0.8px;
+  color:var(--blue-light); font-weight:700; margin-bottom:6px;
+  padding-bottom:4px; border-bottom:1px solid var(--border);
+}
+.qtd-row { display:flex; align-items:center; justify-content:space-between; padding:3px 0; }
+.qtd-name { font-size:10px; color:var(--text2); }
+.qtd-val { font-size:11px; font-weight:700; color:var(--text); }
+.qtd-bar-wrap { flex:1; height:4px; background:var(--bg); border-radius:2px; margin:0 10px; max-width:80px; }
+.qtd-bar-fill { height:100%; border-radius:2px; background:var(--blue); }
+
+
+
+/* RISK LEGEND / INFO */
+.risk-info-toggle {
+  background:none; border:1px solid var(--border); color:var(--text3);
+  width:22px; height:22px; border-radius:50%; cursor:pointer; font-size:10px;
+  display:flex; align-items:center; justify-content:center; transition:all .15s;
+}
+.risk-info-toggle:hover { border-color:var(--blue); color:var(--blue); }
+.risk-info-toggle.active { border-color:var(--blue); color:var(--blue); background:var(--blue-dim); }
+.risk-legend-box {
+  display:none; padding:12px 16px; border-top:1px solid var(--border);
+  background:var(--bg); font-size:10px; line-height:1.7; color:var(--text2);
+}
+.risk-legend-box.visible { display:block; }
+.risk-legend-row {
+  display:flex; align-items:flex-start; gap:8px; margin-bottom:8px;
+}
+.risk-legend-row:last-child { margin-bottom:0; }
+.risk-legend-dot {
+  width:8px; height:8px; border-radius:50%; flex-shrink:0; margin-top:4px;
+}
+.risk-legend-label { font-weight:700; color:var(--text); }
+.risk-legend-detail { color:var(--text3); }
+
+
+/* SELLER ONE-PAGER */
+.onepager-btn {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:8px 14px; border-radius:6px; font-size:11px; font-weight:600;
+  font-family:"Inter",sans-serif; cursor:pointer; transition:all .15s;
+  background:linear-gradient(135deg, #006AFF, #338bff); color:#fff;
+  border:none; text-decoration:none;
+}
+.onepager-btn:hover { filter:brightness(1.15); transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,106,255,0.3); }
+.onepager-btn i { font-size:10px; }
+.onepager-copied {
+  position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+  background:var(--green); color:#fff; padding:8px 20px; border-radius:20px;
+  font-size:11px; font-weight:600; font-family:"Inter",sans-serif;
+  z-index:9999; animation:fadeIn .2s ease;
+  box-shadow:0 4px 16px rgba(0,200,83,0.3);
+}
+
+/* DATA AGENT LAUNCHER */
+.agent-fab {
+  position:fixed; bottom:24px; right:24px; z-index:900;
+  width:52px; height:52px; border-radius:50%; border:none;
+  background:linear-gradient(135deg, #006AFF, #338bff); color:#fff;
+  font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  box-shadow:0 4px 20px rgba(0,106,255,0.4); transition:all .25s;
+}
+.agent-fab:hover { transform:scale(1.1); box-shadow:0 6px 28px rgba(0,106,255,0.55); }
+.agent-fab.open { transform:rotate(45deg) scale(1.1); background:var(--red); box-shadow:0 4px 20px rgba(255,61,87,0.4); }
+.agent-fab.open:hover { box-shadow:0 6px 28px rgba(255,61,87,0.55); }
+
+.agent-panel {
+  position:fixed; bottom:88px; right:24px; z-index:899;
+  width:380px; max-height:520px; border-radius:var(--radius);
+  background:var(--bg2); border:1px solid var(--border);
+  box-shadow:0 12px 48px rgba(0,0,0,0.5);
+  display:none; flex-direction:column; overflow:hidden;
+  animation:agentSlideUp .25s ease;
+}
+.agent-panel.visible { display:flex; }
+@keyframes agentSlideUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+
+.agent-panel-header {
+  padding:14px 16px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+}
+.agent-panel-title { font-size:13px; font-weight:700; color:var(--text); }
+.agent-panel-title i { color:var(--blue); margin-right:8px; }
+.agent-panel-badge {
+  font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px;
+  background:var(--green-dim); color:var(--green); padding:3px 8px; border-radius:10px;
+}
+
+.agent-panel-body { padding:16px; overflow-y:auto; flex:1; }
+
+.agent-section-label {
+  font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px;
+  color:var(--text3); margin-bottom:8px; margin-top:14px;
+}
+.agent-section-label:first-child { margin-top:0; }
+
+.agent-desc {
+  font-size:11px; color:var(--text2); line-height:1.6; margin-bottom:12px;
+}
+
+.agent-question-btn {
+  display:block; width:100%; text-align:left; padding:9px 12px;
+  background:var(--bg); border:1px solid var(--border); border-radius:6px;
+  color:var(--text2); font-size:11px; font-family:"Inter",sans-serif;
+  cursor:pointer; transition:all .15s; margin-bottom:6px; line-height:1.4;
+}
+.agent-question-btn:hover { border-color:var(--blue); color:var(--text); background:var(--blue-dim); }
+.agent-question-btn i { color:var(--blue); margin-right:6px; font-size:9px; }
+
+.agent-copy-block {
+  background:var(--bg); border:1px solid var(--border); border-radius:6px;
+  padding:10px 12px; margin-top:6px; position:relative;
+}
+.agent-copy-code {
+  font-family:"SF Mono","Fira Code",monospace; font-size:10px; color:var(--blue-light);
+  word-break:break-all; line-height:1.5; display:block; padding-right:28px;
+}
+.agent-copy-btn {
+  position:absolute; top:8px; right:8px; background:none; border:1px solid var(--border);
+  color:var(--text3); width:24px; height:24px; border-radius:4px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; font-size:10px; transition:all .15s;
+}
+.agent-copy-btn:hover { border-color:var(--blue); color:var(--blue); }
+.agent-copy-btn.copied { border-color:var(--green); color:var(--green); }
+
+.agent-table-grid {
+  display:grid; grid-template-columns:1fr 1fr; gap:4px; margin-bottom:4px;
+}
+.agent-table-tag {
+  font-size:9px; color:var(--text3); background:var(--bg); border-radius:3px;
+  padding:3px 6px; text-align:center; border:1px solid transparent;
+  transition:all .15s;
+}
+.agent-table-tag:hover { border-color:var(--border); color:var(--text2); }
+
+.agent-phase-row {
+  display:flex; align-items:center; gap:8px; padding:6px 0;
+}
+.agent-phase-dot {
+  width:8px; height:8px; border-radius:50%; flex-shrink:0;
+}
+.agent-phase-dot.done { background:var(--green); }
+.agent-phase-dot.current { background:var(--yellow); }
+.agent-phase-dot.future { background:var(--text3); }
+.agent-phase-text { font-size:10px; color:var(--text2); }
+.agent-phase-text strong { color:var(--text); }
+
+/* FOOTER */
+.footer {
+  padding:10px 24px; border-top:1px solid var(--border);
+  display:flex; justify-content:space-between; align-items:center;
+  font-size:9px; color:var(--text3);
+}
+.footer a { color:var(--blue); text-decoration:none; }
+
+/* TRANSITIONS */
+.fade-in { animation: fadeIn .3s ease; }
+@keyframes fadeOut { from { opacity:1; } to { opacity:0; } }
+@keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+
+@media (max-width:1200px) {
+  .main-content { grid-template-columns:1fr; }
+  .table-panel, .alerts-panel { margin:0 0 12px 0; }
+  .bottom-grid { grid-template-columns:1fr 1fr; }
+  .kpi-row { grid-template-columns:repeat(3,1fr); }
+}
+
+/* SPARKLINE */
+.sparkline-svg { vertical-align:middle; }
+
+
+/* SELLER MODAL */
+.seller-modal-overlay {
+  position:fixed; top:0; left:0; right:0; bottom:0;
+  background:rgba(0,0,0,0.7); z-index:200;
+  display:flex; align-items:center; justify-content:center;
+  animation:fadeIn .2s ease;
+}
+.seller-modal {
+  background:var(--bg2); border:1px solid var(--border); border-radius:12px;
+  width:90%; max-width:900px; max-height:90vh; overflow-y:auto;
+  padding:24px; position:relative;
+  animation:slideUp .25s ease;
+  box-shadow:0 20px 60px rgba(0,0,0,0.5);
+}
+@keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+.seller-modal-close {
+  position:sticky; top:0; float:right; z-index:10;
+  background:var(--bg3); border:1px solid var(--border); color:var(--text2);
+  width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:14px;
+  display:flex; align-items:center; justify-content:center; transition:all .15s;
+}
+.seller-modal-close:hover { border-color:var(--red); color:var(--red); background:var(--red-dim); }
+
+/* EXPANDABLE DETAIL */
+.detail-row td { padding:0 !important; border:none !important; }
+.detail-card {
+  background:var(--bg3); border-left:3px solid var(--blue); margin:4px 10px 8px;
+  border-radius:var(--radius); padding:16px; animation:slideDown .25s ease;
+}
+@keyframes slideDown { from { opacity:0; max-height:0; } to { opacity:1; max-height:500px; } }
+.detail-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:12px 0; }
+.detail-metric { background:var(--bg2); border-radius:6px; padding:10px; }
+.detail-metric-label { font-size:9px; color:var(--text3); text-transform:uppercase; letter-spacing:0.6px; }
+.detail-metric-value { font-size:16px; font-weight:700; margin-top:4px; }
+.detail-actions { display:flex; gap:8px; margin-top:12px; }
+.detail-btn {
+  background:var(--blue); color:#fff; border:none; padding:7px 14px;
+  border-radius:var(--radius); font-size:10px; font-family:'Inter',sans-serif;
+  font-weight:600; cursor:pointer; text-decoration:none; display:inline-flex;
+  align-items:center; gap:5px; transition:all .15s;
+}
+.detail-btn:hover { background:var(--blue-light); }
+.detail-btn.secondary { background:var(--bg4); color:var(--text2); }
+.detail-btn.secondary:hover { background:var(--bg3); color:var(--text); }
+.detail-info { display:flex; gap:16px; flex-wrap:wrap; margin:8px 0; }
+.detail-tag { font-size:10px; color:var(--text2); display:flex; align-items:center; gap:4px; }
+.detail-tag i { color:var(--blue); font-size:9px; }
+.detail-tag .stars { color:var(--yellow); letter-spacing:1px; }
+.badge-contract { font-size:9px; background:var(--blue-dim); color:var(--blue-light); padding:2px 8px; border-radius:3px; font-weight:700; }
+.badge-standard { font-size:9px; background:rgba(94,122,148,0.15); color:var(--text3); padding:2px 8px; border-radius:3px; font-weight:700; }
+
+/* CSV EXPORT BTN */
+.export-btn {
+  background:var(--bg3); border:1px solid var(--border); color:var(--text2);
+  padding:5px 12px; border-radius:var(--radius); font-size:10px; cursor:pointer;
+  font-family:'Inter',sans-serif; font-weight:600; transition:all .15s;
+  display:inline-flex; align-items:center; gap:5px;
+}
+.export-btn:hover { border-color:var(--blue); color:var(--blue-light); background:var(--blue-dim); }
+
+/* SFDC LINK */
+.sfdc-link {
+  color:var(--text3); font-size:11px; cursor:pointer; transition:color .15s;
+  text-decoration:none;
+}
+.sfdc-link:hover { color:var(--blue-light); }
+
+/* DATE RANGE SELECTOR */
+.date-range-bar { display:flex; gap:6px; padding:8px 16px; border-bottom:1px solid var(--border); }
+.range-btn {
+  background:var(--bg3); border:1px solid var(--border); color:var(--text2);
+  padding:4px 10px; border-radius:var(--radius); font-size:9px; cursor:pointer;
+  font-family:'Inter',sans-serif; font-weight:600; transition:all .15s;
+}
+.range-btn:hover { border-color:var(--blue); color:var(--text); }
+.range-btn.active { background:var(--blue-dim); border-color:var(--blue); color:var(--blue-light); }
+
+
+/* VELOCITY */
+.vel-up { color:var(--green); font-weight:700; }
+.vel-down { color:var(--red); font-weight:700; }
+.vel-flat { color:var(--text3); }
+.vel-badge { font-size:9px; padding:1px 6px; border-radius:8px; font-weight:700; display:inline-flex; align-items:center; gap:2px; }
+.vel-badge.accel { background:var(--green-dim); color:var(--green); }
+.vel-badge.decel { background:var(--red-dim); color:var(--red); }
+.vel-badge.stable { background:rgba(94,122,148,0.15); color:var(--text3); }
+
+/* PEER BENCHMARK */
+.peer-bar { display:flex; align-items:center; gap:6px; margin-top:8px; }
+.peer-track { flex:1; height:8px; background:var(--bg); border-radius:4px; position:relative; }
+.peer-marker { position:absolute; top:-2px; width:3px; height:12px; border-radius:1px; }
+.peer-you { background:var(--blue-light); z-index:2; }
+.peer-median { background:var(--text3); z-index:1; }
+.peer-label { font-size:8px; color:var(--text3); white-space:nowrap; }
+
+/* PRODUCT ADOPTION */
+.product-grid { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; }
+.product-pill { font-size:8px; padding:2px 7px; border-radius:10px; font-weight:600; display:inline-flex; align-items:center; gap:3px; }
+.product-pill.active { background:var(--green-dim); color:var(--green); }
+.product-pill.inactive { background:rgba(94,122,148,0.08); color:var(--text3); border:1px dashed rgba(94,122,148,0.2); }
+</style>
+  <script type="application/ld+json">
+{
+  "@context": "urn:goose.ai:schema",
+  "@type": "GooseApp",
+  "name": "au-smb-portfolio-dashboard",
+  "description": "AU SMB Portfolio Health Dashboard for Mallory Brown's team at Square with KPIs, alerts, and activity tracking.",
+  "width": 1600,
+  "height": 1100,
+  "resizable": true,
+  "mcpServers": [
+    "apps"
+  ]
+}
+  </script>
+  <script type="application/x-goose-prd">
+
+AM Portfolio Health Dashboard for Mallory Brown's AU SMB team at Square. Dark theme (#0f1923 bg, #006AFF blue accents). AUD currency.
+
+TOP BAR: Title "AU SMB Portfolio Health Dashboard", subtitle "Team Lead: Mallory Brown • Mar 4, 2026". AM dropdown selector filtering all sections.
+
+5 KPI CARDS: Total Accounts 1728, Portfolio GPV A$839.1M, Active Merchants 2008, At-Risk 213 (red), Watch 1077 (yellow).
+
+MAIN TABLE (left 60%): Sortable accounts with search box and risk filter buttons. Columns: Name, Category icon, GPV Tier badge, GPV, YoY%, Days Since Activity, Health bar, Risk flag. Include 15+ real AU business accounts per AM with mix of healthy/watch/at-risk.
+
+ALERTS PANEL (right 40% top): Scrollable list of 10 at-risk accounts with dismiss buttons showing business name, AM, days since contact, GPV decline reason.
+
+GPV TREND (bottom left): SVG line chart, 6 months: Sep $70.7M, Oct $78.4M, Nov $79.3M, Dec $81.2M, Jan $76.3M, Feb $71.9M.
+
+ACTIVITY PANEL (bottom center): Horizontal stacked bar chart showing this week's activities per AM.
+
+QTD METRICS (bottom right): Small table of dials, DM calls, new seller breadth per AM.
+
+AM DATA for dropdown filtering:
+All Team: 1728 accts, A$839.1M
+Antony Haddrick: 431 accts, A$181.4M, top accounts Frank Green A$3.3M retail +48%, Boost Juice A$2.7M food +11%, Zambrero A$2.4M food +15%, Lovisa A$1.8M retail +20%, Cotton On A$1.6M retail +5%
+Simran Sandhu: 265 accts, A$148.4M, top Gather'd Hospitality A$6.2M food +20%, Bluebottle Coffee A$2.8M food +15%, Priceline A$2.1M retail +5%
+Pascale Dexter: 290 accts, A$127.3M, top Sunshine Coast Food Trucks A$5.0M food +22%, Gold Class Nails A$3.4M beauty +19%
+Liv McDonald: 323 accts, A$177.6M, top Liberty Hall A$4.6M food +8%, Guzman y Gomez A$3.5M food +22%
+Mitch Langdon: 287 accts, A$152.7M, top GYG West A$3.1M food +18%, San Churro A$2.5M food +9%
+Victoria Fabian: 48 accts, A$12.4M, top Archie Rose A$1.2M food +25%
+Eitan Dankner: 69 accts, A$30.5M (RAMPING)
+Elena Kingham: 11 accts, A$5.6M (RAMPING)
+Emily Desmond: 4 accts, A$3.2M (ON LEAVE)
+
+ALERTS: oz laziko 999 days no contact GPV dropping, BROOKFIELD SHOW SOCIETY 181 days, ACIA BAR 133 days GPV -30%, Uncle Don South City 85 days, Curves Gym 70 days GPV -15%, Pie Face 65 days GPV -20%
+
+WEEKLY ACTIVITY (this week): Antony 143 (108 calls 22 email 13 sms), Elena 127 (87 calls 9 email 28 sms), Victoria 103 (44 calls 13 email 44 sms), Eitan 73 (70 calls 3 sms), Pascale 57 (40 calls 10 email), Mitch 50 (27 calls 11 email 12 sms), Simran 45 (24 calls 19 email), Emily 12, Liv 8
+
+QTD: Dials - Elena 39, Eitan 24, Antony 20, Pascale 13, Simran 7, Victoria 6, Mitch 4, Liv 1. DM Calls - Antony 10, Pascale 7, Eitan 6, Elena 4, Victoria 4. New Seller - Eitan 5, Antony 3, Elena 3, Pascale 2.
+
+FOOTER: Data sources and refresh timestamp. CSS Grid layout, smooth transitions, responsive.
+
+  </script>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <h1><i class="fas fa-chart-line" style="color:var(--blue);margin-right:8px;font-size:14px;"></i>AU SMB Portfolio Health <span>Dashboard</span></h1>
+    <p>Team Lead: Mallory Brown &bull; Mar 4, 2026 &bull; Square AU</p>
+  </div>
+  <div class="topbar-right">
+    <select class="am-select" id="amSelect"></select>
+  </div>
+</div>
+
+<!-- KPI CARDS -->
+<div class="kpi-row" id="kpiRow"></div>
+
+<!-- MAIN CONTENT -->
+<div class="main-content">
+  <div class="panel table-panel">
+    <div class="panel-header">
+      <div class="panel-title"><i class="fas fa-building"></i>Account Portfolio</div>
+      <span id="tableCount" style="font-size:10px;color:var(--text3);"></span>
+    </div>
+    <div class="table-controls">
+      <button class="export-btn" onclick="exportCSV()" title="Export filtered accounts to CSV"><i class="fas fa-download"></i>Export CSV</button>
+      <div class="search-wrap">
+        <i class="fas fa-search"></i>
+        <input type="text" class="search-box" id="searchBox" placeholder="Search accounts...">
+      </div>
+      <button class="filter-btn active" data-filter="all" onclick="setFilter('all',this)">All</button>
+      <button class="filter-btn risk-green" data-filter="healthy" onclick="setFilter('healthy',this)">Healthy</button>
+      <button class="filter-btn risk-yellow" data-filter="watch" onclick="setFilter('watch',this)">Watch</button>
+      <button class="filter-btn risk-red" data-filter="at-risk" onclick="setFilter('at-risk',this)">At-Risk</button>
+      <button class="filter-btn" data-filter="contract" onclick="setFilter('contract',this)" style="margin-left:6px;"><i class="fas fa-file-contract" style="margin-right:3px;"></i>Contract</button>
+    </div>
+    <div class="table-scroll" id="tableScroll">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th onclick="sortTable(0)">Name <span class="sort-icon">⇅</span></th>
+            <th onclick="sortTable(1)">Cat</th>
+            <th onclick="sortTable(2)">GPV Tier</th>
+            <th>Trend</th>
+            <th onclick="sortTable(3)">GPV (A$)</th>
+            <th onclick="sortTable(4)">YoY%</th>
+            <th onclick="sortTable(5)">Last Contact</th>
+            <th onclick="sortTable(6)">Health</th>
+            <th onclick="sortTable(7)">Risk</th>
+            <th>Type</th>
+            <th>AM</th>
+            <th>SFDC</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    <div class="table-footer">
+      <span id="tableInfo">Showing all accounts</span>
+      <span>Sorted by GPV descending</span>
+    </div>
+  </div>
+
+  <div class="panel alerts-panel">
+    <div class="panel-header">
+      <div class="panel-title"><i class="fas fa-exclamation-triangle"></i>At-Risk Alerts</div>
+      <span id="alertCount" style="font-size:10px;color:var(--red);font-weight:700;"></span>
+    </div>
+    <div class="alerts-scroll" id="alertsScroll"></div>
+  </div>
+</div>
+
+<!-- BOTTOM GRID -->
+<div class="bottom-grid">
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title" id="gpvPanelTitle"><i class="fas fa-chart-area"></i>GPV Trend (6 Mo)</div>
+      <button class="risk-info-toggle" id="riskInfoToggle" onclick="toggleRiskLegend()" title="What do these mean?" style="display:none;"><i class="fas fa-info"></i></button>
+    </div>
+    <div class="chart-container" id="gpvChart"></div>
+    <div class="risk-legend-box" id="riskLegendBox">
+      <div class="risk-legend-row">
+        <div class="risk-legend-dot" style="background:#00c853;"></div>
+        <div><span class="risk-legend-label">Healthy</span> <span class="risk-legend-detail">&mdash; Health score 65+. Growing or stable GPV, recent AM contact, multiple products adopted. These sellers are engaged and expanding.</span></div>
+      </div>
+      <div class="risk-legend-row">
+        <div class="risk-legend-dot" style="background:#ffc107;"></div>
+        <div><span class="risk-legend-label">Watch</span> <span class="risk-legend-detail">&mdash; Health score 40&ndash;64. Flat or slightly declining GPV, gaps in contact or product adoption. Not yet at risk, but need proactive attention.</span></div>
+      </div>
+      <div class="risk-legend-row">
+        <div class="risk-legend-dot" style="background:#ff3d57;"></div>
+        <div><span class="risk-legend-label">At Risk</span> <span class="risk-legend-detail">&mdash; Health score below 40. Declining GPV, long gaps since last contact, low product adoption, or no contract. These sellers need immediate outreach.</span></div>
+      </div>
+      <div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--border); color:var(--text3); font-size:9px;">
+        <i class="fas fa-lightbulb" style="color:var(--yellow);margin-right:4px;"></i>Health score combines GPV trend, contact recency, product count, contract status, and tenure. Click any seller row above for full retention intelligence.
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title"><i class="fas fa-phone-alt"></i>Weekly Activity</div>
+      <span style="font-size:9px;color:var(--text3);">This Week</span>
+    </div>
+    <div class="date-range-bar">
+      <button class="range-btn active" onclick="setRange(1,this)">This Week</button>
+      <button class="range-btn" onclick="setRange(2.2,this)">2 Weeks</button>
+      <button class="range-btn" onclick="setRange(4.5,this)">Month</button>
+      <button class="range-btn" onclick="setRange(13,this)">Quarter</button>
+    </div>
+    <div class="activity-scroll" id="activityBars"></div>
+    <div class="activity-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--blue);"></div>Calls</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--green);"></div>Email</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--orange);"></div>SMS</div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title"><i class="fas fa-bullseye"></i>QTD Metrics</div>
+    </div>
+    <div class="qtd-scroll" id="qtdPanel"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title"><i class="fas fa-chart-pie"></i>GPV by Category</div>
+    </div>
+    <div style="padding:10px 16px;max-height:220px;overflow-y:auto;" id="catChart"></div>
+  </div>
+</div>
+
+
+<!-- DATA AGENT -->
+<button class="agent-fab" id="agentFab" onclick="toggleAgentPanel()" title="Data Agent">
+  <i class="fas fa-robot"></i>
+</button>
+<div class="agent-panel" id="agentPanel">
+  <div class="agent-panel-header">
+    <div class="agent-panel-title"><i class="fas fa-robot"></i>Data Agent</div>
+    <div class="agent-panel-badge">Phase 1 Ready</div>
+  </div>
+  <div class="agent-panel-body">
+    <div class="agent-desc">
+      Ask natural language questions about your sellers, book of business, comp metrics, hardware, churn risk, and more &mdash; powered by <strong>25+ Snowflake tables</strong> via Goose.
+    </div>
+
+    <div class="agent-section-label">Try asking</div>
+    <button class="agent-question-btn" onclick="copyAgentQ(this)"><i class="fas fa-chart-line"></i>How am I pacing to my GPV goal this quarter?</button>
+    <button class="agent-question-btn" onclick="copyAgentQ(this)"><i class="fas fa-user-slash"></i>Who is at highest churn risk in my book?</button>
+    <button class="agent-question-btn" onclick="copyAgentQ(this)"><i class="fas fa-box-open"></i>What products is Bromley's Bread using?</button>
+    <button class="agent-question-btn" onclick="copyAgentQ(this)"><i class="fas fa-hdd"></i>Which sellers have hardware approaching end of life?</button>
+    <button class="agent-question-btn" onclick="copyAgentQ(this)"><i class="fas fa-headset"></i>How many open CS cases do my sellers have?</button>
+    <button class="agent-question-btn" onclick="copyAgentQ(this)"><i class="fas fa-arrow-down"></i>Show me sellers with declining transactions this quarter</button>
+
+    <div class="agent-section-label">How to use</div>
+    <div class="agent-desc">
+      Open <strong>Goose</strong> and paste this command to load the data agent recipe. Then ask any question about your book.
+    </div>
+    <div class="agent-copy-block">
+      <code class="agent-copy-code" id="agentRecipeCmd">load the file recipes/seller-signals-agent.yaml</code>
+      <button class="agent-copy-btn" onclick="copyRecipeCmd()" title="Copy to clipboard"><i class="fas fa-copy"></i></button>
+    </div>
+
+    <div class="agent-section-label">Data Coverage (25+ tables)</div>
+    <div class="agent-table-grid">
+      <span class="agent-table-tag">Churn Predictions</span>
+      <span class="agent-table-tag">Hardware Lifecycle</span>
+      <span class="agent-table-tag">Product Adoption</span>
+      <span class="agent-table-tag">Cross-Sell Funnels</span>
+      <span class="agent-table-tag">Seller Insights</span>
+      <span class="agent-table-tag">Engagement</span>
+      <span class="agent-table-tag">Device Health</span>
+      <span class="agent-table-tag">GPV &amp; AR Metrics</span>
+      <span class="agent-table-tag">Pacing to Goal</span>
+      <span class="agent-table-tag">AM Activities</span>
+      <span class="agent-table-tag">Contracts</span>
+      <span class="agent-table-tag">CS Cases</span>
+      <span class="agent-table-tag">SaaS Subscriptions</span>
+      <span class="agent-table-tag">NNRO</span>
+    </div>
+
+    <div class="agent-section-label">Roadmap</div>
+    <div class="agent-phase-row"><div class="agent-phase-dot done"></div><div class="agent-phase-text"><strong>Recipe built</strong> &mdash; ask questions via Goose</div></div>
+    <div class="agent-phase-row"><div class="agent-phase-dot current"></div><div class="agent-phase-text"><strong>Next:</strong> Embedded chat widget + backend</div></div>
+    <div class="agent-phase-row"><div class="agent-phase-dot future"></div><div class="agent-phase-text"><strong>Future:</strong> Full agentic call prep briefings</div></div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <span>Data Sources: Square Dashboard API, Salesforce CRM, Looker BI &bull; Currency: AUD</span>
+  <span>Last refreshed: Mar 4, 2026 09:14 AEDT &bull; Auto-refresh: 15 min</span>
+</div>
+
+<script src="data.js"></script>
+<script>
+// ===== MAP DATA.js INTO LOCAL VARIABLES =====
+const amFullNames = {
+  antony:'Antony Haddrick', simran:'Simran Sandhu', pascale:'Pascale Dexter',
+  liv:'Liv McDonald', mitch:'Mitch Langdon', victoria:'Victoria Fabian',
+  eitan:'Eitan Dankner', elena:'Elena Kingham', emily:'Emily Desmond'
+};
+
+// Build amData from DATA.amSummary + DATA.teamTotal
+const amData = {};
+const tt = DATA.teamTotal;
+amData.all = { name:'All Team', accts:tt.accts, gpv:tt.gpv, active:tt.healthy+tt.watch, atRisk:tt.at_risk, watch:tt.watch };
+Object.keys(DATA.amSummary).forEach(key => {
+  const s = DATA.amSummary[key];
+  const isRamping = (key === 'eitan' || key === 'elena');
+  const isLeave = (key === 'emily');
+  amData[key] = {
+    name: amFullNames[key] || key,
+    accts: s.accts, gpv: s.gpv, active: s.healthy + s.watch,
+    atRisk: s.at_risk, watch: s.watch,
+    ...(isRamping ? {ramping:true} : {}),
+    ...(isLeave ? {onLeave:true} : {})
+  };
+});
+
+// Map accounts from DATA.accounts (all 1729)
+const accounts = DATA.accounts.map(a => ({
+  name: a.n, cat: a.c, tier: a.t, gpv: a.g, gpv9: a.g9, yoy: a.y,
+  days: a.d, health: a.h, risk: a.r === 'at_risk' ? 'at-risk' : a.r,
+  am: a.am, sf: a.sf, ar: a.ar, at: a.at, locations: a.l,
+  tenure: a.tn, contract: a.ct, activities30d: a.a30, csatStars: a.cs, ci: a.ci,
+  lastProcessed: a.lp,
+  products: a.products ? a.products.split(',') : [],
+  city: a.city || '', state: a.state || '', postcode: a.pc || '',
+  serviceLevel: a.svc || '', sellerClass: a.cls || '',
+  saasAr: a.sar || 0,
+  bid: a.bid || ''
+}));
+
+// Map alerts from DATA.alerts
+// Build alert-to-account lookup for enrichment
+const alertAcctMap = {};
+DATA.accounts.forEach(a => { alertAcctMap[a.n] = a; });
+
+const alerts = DATA.alerts.map(a => {
+  const acct = alertAcctMap[a.n] || {};
+  return {
+    name: a.n, am: amFullNames[a.am] || a.am, days: a.d, reason: a.reason,
+    sf: acct.sf || '', gpv: acct.g || 0, contract: acct.ct || false
+  };
+});
+
+// Map weekly activity — use latest week only for "This Week"
+const latestWeek = DATA.weekly.reduce((max, w) => w.week > max ? w.week : max, '');
+const weeklyActivity = DATA.weekly
+  .filter(w => w.week === latestWeek)
+  .map(w => ({ name: w.name, total: w.total, calls: w.calls, email: w.emails, sms: w.sms, key: w.am }))
+  .sort((a,b) => b.total - a.total);
+
+// Map all weekly data for range selector
+const allWeeklyData = DATA.weekly;
+const uniqueWeeks = [...new Set(DATA.weekly.map(w => w.week))].sort();
+
+// Map QTD from DATA.qtd — build sorted arrays for each metric
+const qtdEntries = Object.entries(DATA.qtd).map(([key, v]) => ({ key, name: amFullNames[key]?.split(' ')[0] || key, ...v }));
+const qtdDials = qtdEntries.map(e => ({name:e.name, val:e.dms, key:e.key})).sort((a,b)=>b.val-a.val);
+const qtdDM = qtdEntries.map(e => ({name:e.name, val:e.dm_convos, key:e.key})).sort((a,b)=>b.val-a.val);
+const qtdSeller = qtdEntries.map(e => ({name:e.name, val:e.biz_touched, key:e.key})).sort((a,b)=>b.val-a.val);
+
+// Map GPV trend
+const gpvTrend = DATA.gpvTrend.map(d => ({ month: d.m, val: d.v }));
+
+// Feature news for seller-matched awareness
+const featureNews = DATA.featureNews || [];
+
+const catIcons = {
+  food:'fa-utensils', retail:'fa-shopping-bag', beauty:'fa-spa',
+  fitness:'fa-dumbbell', services:'fa-concierge-bell', events:'fa-ticket-alt', drinks:'fa-coffee'
+};
+
+let currentAM = 'all';
+let currentFilter = 'all';
+let currentSearch = '';
+let sortCol = 3;
+let sortAsc = false;
+
+// ===== RENDER FUNCTIONS =====
+function renderKPIs() {
+  const d = amData[currentAM];
+  const row = document.getElementById('kpiRow');
+  let extra = '';
+  if (d.ramping) extra = ' <span class="badge-ramping">RAMPING</span>';
+  if (d.onLeave) extra = ' <span class="badge-leave">ON LEAVE</span>';
+  row.innerHTML = `
+    <div class="kpi-card blue fade-in">
+      <div class="kpi-accent"></div>
+      <div class="kpi-icon"><i class="fas fa-building"></i></div>
+      <div class="kpi-label">Total Accounts${extra}</div>
+      <div class="kpi-value">${d.accts.toLocaleString()}</div>
+      <div class="kpi-sub">${currentAM==='all'?'Across 9 AMs':d.name}</div>
+    </div>
+    <div class="kpi-card blue fade-in">
+      <div class="kpi-accent"></div>
+      <div class="kpi-icon"><i class="fas fa-dollar-sign"></i></div>
+      <div class="kpi-label">Portfolio GPV</div>
+      <div class="kpi-value">A$${d.gpv.toFixed(1)}M</div>
+      <div class="kpi-sub">Gross Payment Volume</div>
+    </div>
+    <div class="kpi-card green fade-in">
+      <div class="kpi-accent"></div>
+      <div class="kpi-icon"><i class="fas fa-store"></i></div>
+      <div class="kpi-label">Active Merchants</div>
+      <div class="kpi-value">${d.active.toLocaleString()}</div>
+      <div class="kpi-sub">Processed in last 30d</div>
+    </div>
+    <div class="kpi-card red fade-in">
+      <div class="kpi-accent"></div>
+      <div class="kpi-icon"><i class="fas fa-exclamation-circle"></i></div>
+      <div class="kpi-label">At-Risk</div>
+      <div class="kpi-value">${d.atRisk}</div>
+      <div class="kpi-sub">Requires immediate action</div>
+    </div>
+    <div class="kpi-card yellow fade-in">
+      <div class="kpi-accent"></div>
+      <div class="kpi-icon"><i class="fas fa-eye"></i></div>
+      <div class="kpi-label">Watch</div>
+      <div class="kpi-value">${d.watch.toLocaleString()}</div>
+      <div class="kpi-sub">Monitor closely</div>
+    </div>
+  `;
+}
+
+function getFilteredAccounts() {
+  let list = accounts;
+  if (currentAM !== 'all') list = list.filter(a => a.am === currentAM);
+  if (currentFilter === 'contract') list = list.filter(a => a.contract);
+  else if (currentFilter !== 'all') list = list.filter(a => a.risk === currentFilter);
+  if (currentSearch) {
+    const s = currentSearch.toLowerCase();
+    list = list.filter(a => a.name.toLowerCase().includes(s));
+  }
+  list.sort((a, b) => {
+    let va, vb;
+    switch(sortCol) {
+      case 0: va=a.name.toLowerCase(); vb=b.name.toLowerCase(); return sortAsc?va.localeCompare(vb):vb.localeCompare(va);
+      case 1: va=a.cat; vb=b.cat; return sortAsc?va.localeCompare(vb):vb.localeCompare(va);
+      case 2: va=a.tier; vb=b.tier; return sortAsc?va-vb:vb-va;
+      case 3: va=a.gpv; vb=b.gpv; return sortAsc?va-vb:vb-va;
+      case 4: va=a.yoy; vb=b.yoy; return sortAsc?va-vb:vb-va;
+      case 5: va=a.days; vb=b.days; return sortAsc?va-vb:vb-va;
+      case 6: va=a.health; vb=b.health; return sortAsc?va-vb:vb-va;
+      case 7: const ro={healthy:0,watch:1,'at-risk':2}; va=ro[a.risk]; vb=ro[b.risk]; return sortAsc?va-vb:vb-va;
+      default: return 0;
+    }
+  });
+  return list;
+}
+
+function riskReason(a) {
+  var parts = [];
+  // GPV trend
+  if (a.yoy <= -15) parts.push('GPV declining ' + a.yoy + '%');
+  else if (a.yoy < -5) parts.push('GPV down ' + a.yoy + '%');
+  else if (a.yoy < 5) parts.push('Flat GPV (' + (a.yoy >= 0 ? '+' : '') + a.yoy + '%)');
+  else parts.push('GPV growing +' + a.yoy + '%');
+  // Contact recency
+  if (a.days >= 180) parts.push('no contact in ' + a.days + ' days');
+  else if (a.days >= 90) parts.push(a.days + ' days since contact');
+  else if (a.days >= 30) parts.push('contacted ' + a.days + ' days ago');
+  else parts.push('contacted ' + a.days + 'd ago');
+  // Products
+  var pCount = a.products ? a.products.length : 0;
+  if (pCount <= 1) parts.push('only ' + pCount + ' product');
+  else if (pCount <= 2) parts.push(pCount + ' products');
+  else parts.push(pCount + ' products adopted');
+  // Contract
+  if (a.contract) parts.push('contracted');
+  else parts.push('no contract');
+  return parts.join(', ');
+}
+
+function renderTable() {
+  const list = getFilteredAccounts();
+  const tbody = document.getElementById('tableBody');
+  const amNames = { antony:'AH', simran:'SS', pascale:'PD', liv:'LM', mitch:'ML', victoria:'VF', eitan:'ED', elena:'EK', emily:'EmD' };
+  tbody.innerHTML = list.map(a => {
+    const tierLabel = a.tier===1?'Tier 1':a.tier===2?'Tier 2':'Tier 3';
+    const tierClass = a.tier===1?'gpv-tier1':a.tier===2?'gpv-tier2':'gpv-tier3';
+    const healthColor = a.health>=70?'var(--green)':a.health>=40?'var(--yellow)':'var(--red)';
+    const riskLabel = a.risk==='at-risk'?'At-Risk':a.risk==='watch'?'Watch':'Healthy';
+    const riskClass = 'risk-'+a.risk;
+    return `<tr class="fade-in">
+      <td style="font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;" title="${a.name}">${a.name}</td>
+      <td><span class="cat-icon cat-${a.cat}"><i class="fas ${catIcons[a.cat]}"></i></span></td>
+      <td><span class="gpv-badge ${tierClass}">${tierLabel}</span></td>
+      <td style="font-weight:700;">$${a.gpv.toFixed(1)}M</td>
+      <td class="${a.yoy>=0?'yoy-pos':'yoy-neg'}" style="font-weight:600;">${a.yoy>=0?'+':''}${a.yoy}%</td>
+      <td style="color:${a.days>60?'var(--red)':a.days>30?'var(--yellow)':'var(--text2)'};font-weight:${a.days>60?'700':'400'};">${a.days}</td>
+      <td><div class="health-bar-wrap"><div class="health-bar-fill" style="width:${a.health}%;background:${healthColor};"></div></div></td>
+      <td><span class="risk-flag ${riskClass}" title="${riskReason(a)}">${riskLabel}</span></td>
+      <td style="color:var(--text3);font-size:10px;">${amNames[a.am]||a.am}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('tableCount').textContent = list.length + ' accounts';
+  document.getElementById('tableInfo').textContent = `Showing ${list.length} of ${currentAM==='all'?accounts.length:accounts.filter(a=>a.am===currentAM).length} accounts`;
+}
+
+function renderAlerts() {
+  const scroll = document.getElementById('alertsScroll');
+  let filtered = alerts;
+  if (currentAM !== 'all') {
+    const amFullName = amData[currentAM].name;
+    filtered = alerts.filter(a => a.am === amFullName);
+  }
+  document.getElementById('alertCount').textContent = filtered.length + ' alerts';
+  scroll.innerHTML = filtered.map((a, i) => {
+    const sfLink = a.sf ? 'https://squareinc.lightning.force.com/lightning/r/Account/' + a.sf + '/view' : '#';
+    return '<div class="alert-item fade-in" id="alert-' + i + '">' +
+      '<div class="alert-icon"><i class="fas fa-exclamation-triangle"></i></div>' +
+      '<div class="alert-body">' +
+        '<div class="alert-name">' + a.name + (a.contract ? ' <span class=\'badge-contract\' style=\'font-size:8px;\'>CONTRACT</span>' : '') + '</div>' +
+        '<div class="alert-meta">' + a.am + ' &bull; GPV A$' + (a.gpv||0).toFixed(2) + 'M</div>' +
+        '<div class="alert-reason"><i class="fas fa-info-circle" style="margin-right:4px;"></i>' + a.reason + '</div>' +
+        '<div style="margin-top:6px;display:flex;gap:6px;">' +
+          '<a class="detail-btn" href="' + sfLink + '" target="_blank" style="font-size:9px;padding:4px 10px;"><i class="fas fa-external-link-alt"></i>SFDC</a>' +
+          '<button class="detail-btn secondary" style="font-size:9px;padding:4px 10px;" onclick="event.stopPropagation();searchAccount(\'' + a.name.replace(/'/g, "\\'") + '\')"><i class="fas fa-search"></i>Find</button>' +
+        '</div>' +
+      '</div>' +
+      '<button class="alert-dismiss" onclick="dismissAlert(' + i + ')" title="Dismiss"><i class="fas fa-times"></i></button>' +
+    '</div>';
+  }).join('');
+}
+
+function dismissAlert(i) {
+  const el = document.getElementById('alert-'+i);
+  if (el) { el.classList.add('dismissed'); setTimeout(()=>el.style.display='none',300); }
+}
+
+function renderGPVChart() {
+  const container = document.getElementById('gpvChart');
+  const titleEl = document.getElementById('gpvPanelTitle');
+
+  if (currentAM === 'all') {
+    // Team view: show the 6-month GPV trend line chart
+    titleEl.innerHTML = '<i class="fas fa-chart-area"></i>GPV Trend (6 Mo)';
+    document.getElementById('riskInfoToggle').style.display = 'none';
+    document.getElementById('riskLegendBox').classList.remove('visible');
+    document.getElementById('riskInfoToggle').classList.remove('active');
+    const w=420, h=160, pad={t:20,r:20,b:30,l:50};
+    const cw=w-pad.l-pad.r, ch=h-pad.t-pad.b;
+    const vals = gpvTrend.map(d=>d.val);
+    const minV = Math.floor(Math.min(...vals)-5);
+    const maxV = Math.ceil(Math.max(...vals)+5);
+    const xStep = cw/(vals.length-1);
+    const points = gpvTrend.map((d,i) => {
+      const x = pad.l + i*xStep;
+      const y = pad.t + ch - ((d.val-minV)/(maxV-minV))*ch;
+      return {x,y,val:d.val,month:d.month};
+    });
+    const linePath = points.map((p,i)=>((i===0?'M':'L')+p.x+','+p.y)).join(' ');
+    const areaPath = linePath + ` L${points[points.length-1].x},${pad.t+ch} L${points[0].x},${pad.t+ch} Z`;
+    const gridLines = [minV, minV+Math.round((maxV-minV)/3), minV+Math.round(2*(maxV-minV)/3), maxV].map(v => {
+      const y = pad.t + ch - ((v-minV)/(maxV-minV))*ch;
+      return `<line x1="${pad.l}" y1="${y}" x2="${w-pad.r}" y2="${y}" stroke="rgba(30,51,71,0.6)" stroke-width="1"/>
+              <text x="${pad.l-8}" y="${y+3}" fill="#5e7a94" font-size="9" text-anchor="end">$${v}M</text>`;
+    }).join('');
+    const dots = points.map(p =>
+      `<circle cx="${p.x}" cy="${p.y}" r="4" fill="#006AFF" stroke="#0f1923" stroke-width="2"/>
+       <text x="${p.x}" y="${p.y-10}" fill="#e8edf2" font-size="9" text-anchor="middle" font-weight="600">$${p.val}M</text>`
+    ).join('');
+    const labels = points.map(p =>
+      `<text x="${p.x}" y="${h-5}" fill="#5e7a94" font-size="9" text-anchor="middle">${p.month}</text>`
+    ).join('');
+    container.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="100%" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#006AFF" stop-opacity="0.3"/>
+          <stop offset="100%" stop-color="#006AFF" stop-opacity="0.02"/>
+        </linearGradient>
+      </defs>
+      ${gridLines}
+      <path d="${areaPath}" fill="url(#areaGrad)"/>
+      <path d="${linePath}" fill="none" stroke="#006AFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      ${dots}
+      ${labels}
+    </svg>`;
+  } else {
+    // AM view: show GPV by Risk Status breakdown
+    titleEl.innerHTML = '<i class="fas fa-shield-alt"></i>GPV by Risk Status';
+    document.getElementById('riskInfoToggle').style.display = 'flex';
+    const myAccts = accounts.filter(a => a.am === currentAM);
+    const buckets = [
+      { key: 'healthy', label: 'Healthy', color: '#00c853', dimColor: 'rgba(0,200,83,0.15)' },
+      { key: 'watch', label: 'Watch', color: '#ffc107', dimColor: 'rgba(255,193,7,0.15)' },
+      { key: 'at-risk', label: 'At Risk', color: '#ff3d57', dimColor: 'rgba(255,61,87,0.15)' }
+    ];
+    const totalGPV = myAccts.reduce((s,a) => s + a.gpv, 0);
+    buckets.forEach(b => {
+      const ba = myAccts.filter(a => a.risk === b.key);
+      b.gpv = ba.reduce((s,a) => s + a.gpv, 0);
+      b.count = ba.length;
+      b.pct = totalGPV > 0 ? (b.gpv / totalGPV * 100) : 0;
+    });
+
+    const w = 420, h = 160, pad = {t:12, r:16, b:8, l:16};
+    const barAreaTop = pad.t;
+    const barH = 28;
+    const barY = barAreaTop + 4;
+    const barW = w - pad.l - pad.r;
+
+    // Stacked horizontal bar
+    let barSegments = '';
+    let xOff = pad.l;
+    buckets.forEach(b => {
+      if (b.pct > 0) {
+        const segW = (b.pct / 100) * barW;
+        barSegments += `<rect x="${xOff}" y="${barY}" width="${segW}" height="${barH}" fill="${b.color}" rx="0"/>`;
+        if (b.pct > 8) {
+          barSegments += `<text x="${xOff + segW/2}" y="${barY + barH/2 + 4}" fill="#0f1923" font-size="10" font-weight="700" text-anchor="middle">${Math.round(b.pct)}%</text>`;
+        }
+        xOff += segW;
+      }
+    });
+    // Round the bar ends
+    barSegments = `<clipPath id="barClip"><rect x="${pad.l}" y="${barY}" width="${barW}" height="${barH}" rx="6"/></clipPath>
+      <g clip-path="url(#barClip)">${barSegments}</g>`;
+
+    // Detail rows below the bar
+    const rowStartY = barY + barH + 20;
+    const rowH = 32;
+    let detailRows = '';
+    buckets.forEach((b, i) => {
+      const ry = rowStartY + i * rowH;
+      // Dot + label
+      detailRows += `<circle cx="${pad.l + 5}" cy="${ry}" r="4" fill="${b.color}"/>`;
+      detailRows += `<text x="${pad.l + 16}" y="${ry + 4}" fill="#9bafc4" font-size="11" font-weight="500">${b.label}</text>`;
+      // GPV value
+      detailRows += `<text x="${w/2 + 20}" y="${ry + 4}" fill="#e8edf2" font-size="12" font-weight="700" text-anchor="end">A$${b.gpv.toFixed(1)}M</text>`;
+      // Account count
+      detailRows += `<text x="${w - pad.r}" y="${ry + 4}" fill="#5e7a94" font-size="10" text-anchor="end">${b.count} acct${b.count !== 1 ? 's' : ''}</text>`;
+    });
+
+    container.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="100%" preserveAspectRatio="xMidYMid meet">
+      ${barSegments}
+      ${detailRows}
+    </svg>`;
+  }
+}
+
+function renderActivityBars() {
+  const container = document.getElementById('activityBars');
+  const maxTotal = Math.max(...weeklyActivity.map(a=>a.total));
+  let filtered = weeklyActivity;
+  if (currentAM !== 'all') {
+    filtered = weeklyActivity.filter(a => a.key === currentAM);
+  }
+  container.innerHTML = filtered.map(a => {
+    const cw = (a.calls/maxTotal)*100;
+    const ew = (a.email/maxTotal)*100;
+    const sw = (a.sms/maxTotal)*100;
+    return `<div class="activity-row">
+      <div class="activity-label">${a.name}</div>
+      <div class="activity-bar-wrap">
+        <div class="activity-seg calls" style="width:${cw}%;" title="Calls: ${a.calls}"></div>
+        <div class="activity-seg email" style="width:${ew}%;" title="Email: ${a.email}"></div>
+        <div class="activity-seg sms" style="width:${sw}%;" title="SMS: ${a.sms}"></div>
+      </div>
+      <div class="activity-total">${a.total}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderQTD() {
+  const container = document.getElementById('qtdPanel');
+  function renderSection(title, data, maxVal) {
+    let filtered = data;
+    if (currentAM !== 'all') {
+      const shortName = amData[currentAM].name.split(' ')[0];
+      filtered = data.filter(d => d.name === shortName);
+    }
+    const rows = filtered.map(d =>
+      `<div class="qtd-row">
+        <span class="qtd-name">${d.name}</span>
+        <div class="qtd-bar-wrap"><div class="qtd-bar-fill" style="width:${(d.val/maxVal)*100}%;"></div></div>
+        <span class="qtd-val">${d.val}</span>
+      </div>`
+    ).join('');
+    return `<div class="qtd-section"><div class="qtd-section-title">${title}</div>${rows||'<div style="font-size:10px;color:var(--text3);padding:4px 0;">No data</div>'}</div>`;
+  }
+  container.innerHTML =
+    renderSection('Dials', qtdDials, 39) +
+    renderSection('DM Calls', qtdDM, 10) +
+    renderSection('New Seller Breadth', qtdSeller, 5);
+}
+
+function sortTable(col) {
+  if (sortCol === col) sortAsc = !sortAsc;
+  else { sortCol = col; sortAsc = col===0; }
+  renderTable();
+}
+
+function setFilter(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTable();
+}
+
+document.getElementById('searchBox').addEventListener('input', function() {
+  currentSearch = this.value;
+  renderTable();
+});
+
+document.getElementById('amSelect').addEventListener('change', function() {
+  currentAM = this.value;
+  renderKPIs();
+  renderTable();
+  renderAlerts();
+  renderActivityBars();
+  renderQTD();
+  renderCategoryChart();
+  renderGPVChart();
+});
+
+
+
+// Generate sparkline data for each account (visual only — uses yoy to simulate trend)
+accounts.forEach(a => {
+  const pts = [];
+  for (let i = 0; i < 6; i++) {
+    const progress = i / 5;
+    const trend = a.yoy > 0 ? (1 - (1 - progress) * (a.yoy / 100)) : (1 + (1 - progress) * (Math.abs(a.yoy) / 100));
+    const variance = 1 + (Math.random() - 0.5) * 0.08;
+    pts.push(a.gpv * trend * variance);
+  }
+  a.spark = pts;
+  // avgTicket uses 'at' field from data.js (already mapped); ensure it exists
+  a.avgTicket = a.at || 0;
+});
+
+// Compute velocity (g9 vs g) and peer benchmarks
+const catStats = {};
+accounts.forEach(a => {
+  if (!catStats[a.cat]) catStats[a.cat] = [];
+  catStats[a.cat].push(a.gpv);
+});
+Object.keys(catStats).forEach(cat => catStats[cat].sort((a,b) => a - b));
+
+function getPercentile(arr, p) {
+  const idx = Math.floor(arr.length * p);
+  return arr[Math.min(idx, arr.length - 1)];
+}
+
+accounts.forEach(a => {
+  // Velocity: compare 9-month trailing vs annualized
+  a.velocity = a.gpv > 0 ? ((a.gpv9 - a.gpv) / a.gpv * 100) : 0;
+  // Peer stats for this category
+  const peers = catStats[a.cat] || [a.gpv];
+  a.peerMedian = getPercentile(peers, 0.5);
+  a.peerP25 = getPercentile(peers, 0.25);
+  a.peerP75 = getPercentile(peers, 0.75);
+  a.peerMax = peers[peers.length - 1];
+  // Percentile rank
+  const below = peers.filter(v => v < a.gpv).length;
+  a.peerRank = Math.round((below / peers.length) * 100);
+});
+
+function velocityBadge(vel) {
+  if (vel > 5) return '<span class="vel-badge accel"><i class="fas fa-arrow-up" style="font-size:7px;"></i>+' + vel.toFixed(0) + '%</span>';
+  if (vel < -5) return '<span class="vel-badge decel"><i class="fas fa-arrow-down" style="font-size:7px;"></i>' + vel.toFixed(0) + '%</span>';
+  return '<span class="vel-badge stable">~' + vel.toFixed(0) + '%</span>';
+}
+
+
+
+
+function matchFeatures(a) {
+  return featureNews.filter(function(f) {
+    var m = f.match || {};
+    if (m.cat && m.cat.indexOf(a.cat) < 0) return false;
+    if (m.minTicket && (a.avgTicket||0) < m.minTicket) return false;
+    if (m.minLocations && (a.locations||0) < m.minLocations) return false;
+    if (m.minGpv && a.gpv < m.minGpv) return false;
+    if (m.hasProduct) {
+      var found = false;
+      m.hasProduct.forEach(function(p){ if (a.products.indexOf(p) >= 0) found = true; });
+      if (!found) return false;
+    }
+    return true;
+  });
+}
+
+function featureNewsHtml(a) {
+  var matched = matchFeatures(a);
+  if (matched.length === 0) return '';
+  
+  var badgeColors = {
+    'NEW':'var(--green)','FIX':'var(--blue-light)','BENEFIT':'var(--yellow)',
+    'SAVE':'var(--green)','UPDATE':'var(--text2)','IMPROVEMENT':'var(--blue-light)'
+  };
+  var badgeBgs = {
+    'NEW':'var(--green-dim)','FIX':'var(--blue-dim)','BENEFIT':'var(--yellow-dim)',
+    'SAVE':'var(--green-dim)','UPDATE':'rgba(94,122,148,0.15)','IMPROVEMENT':'var(--blue-dim)'
+  };
+  
+  var rows = matched.map(function(f) {
+    return '<div style="padding:6px 0;border-bottom:1px solid rgba(30,51,71,0.3);">' +
+      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">' +
+        '<span style="font-size:8px;padding:1px 6px;border-radius:6px;font-weight:700;background:' + (badgeBgs[f.badge]||'var(--blue-dim)') + ';color:' + (badgeColors[f.badge]||'var(--blue-light)') + ';">' + f.badge + '</span>' +
+        '<span style="font-size:10px;font-weight:700;color:var(--text);">' + f.name + '</span>' +
+        '<span style="font-size:9px;color:var(--text3);margin-left:auto;">' + f.date + '</span>' +
+      '</div>' +
+      '<div style="font-size:11px;color:var(--text2);line-height:1.5;font-style:italic;">"' + f.talk + '"</div>' +
+    '</div>';
+  }).join('');
+  
+  return '<div style="background:var(--bg3);border-radius:8px;padding:12px;margin:8px 0;border-left:3px solid var(--green);">' +
+    '<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;"><i class="fas fa-bullhorn" style="color:var(--green);margin-right:4px;"></i>Relevant Feature Updates — mention on your next call</div>' +
+    rows +
+  '</div>';
+}
+
+function churnRiskFraming(a) {
+  var lines = [];
+  
+  // === HELPERS ===
+  var gpvDollar = (a.gpv * 1000000);
+  var gpvStr = gpvDollar >= 1000000 ? 'A$' + (a.gpv).toFixed(2) + 'M' : 'A$' + (gpvDollar/1000).toFixed(0) + 'K';
+  var prods = a.products.filter(function(p){ return p && p !== 'UNKNOWN' && p !== 'Register POS' && p !== 'Register Terminal'; });
+  var prodCount = prods.length;
+  var saasRatio = a.ar > 0 ? (a.saasAr / a.ar * 100) : 0;
+  var catLabel = {food:'food & beverage',retail:'retail',beauty:'beauty & wellness',services:'services'}[a.cat] || a.cat;
+  
+  // AM portfolio context
+  var amKey = a.am;
+  var amPortfolioGpv = 0;
+  var amPortfolioAr = 0;
+  var amAtRiskCount = 0;
+  accounts.forEach(function(acc){
+    if (acc.am === amKey) {
+      amPortfolioGpv += acc.gpv;
+      amPortfolioAr += acc.ar;
+      if (acc.risk === 'at-risk') amAtRiskCount++;
+    }
+  });
+  var sellerPctGpv = amPortfolioGpv > 0 ? (a.gpv / amPortfolioGpv * 100) : 0;
+  
+  // Peer retention context — how many similar sellers are declining?
+  var catPeers = accounts.filter(function(s){ return s.cat === a.cat && s.name !== a.name; });
+  var catDeclining = catPeers.filter(function(s){ return s.velocity < -10; }).length;
+  var catDecliningPct = catPeers.length > 0 ? Math.round(catDeclining / catPeers.length * 100) : 0;
+  
+  // ============================================================
+  // 1. CHURN PATTERN DIAGNOSIS — what's actually happening here
+  // ============================================================
+  
+  // Failure of Education — long tenure, no product expansion, seller doesn't know what's possible
+  if (prodCount === 0 && a.tenure >= 24) {
+    var yearsStr = (a.tenure/12).toFixed(0);
+    var educLine = '<strong>Failure of Education:</strong> ' + a.name + ' has been with Square for <strong>' + yearsStr + ' years</strong> using only free POS — no SaaS products, no add-ons.';
+    if (a.gpv > 1.0) {
+      educLine += ' At ' + gpvStr + ' GPV, this is a business that clearly works at scale. They\'re not underperforming — they just haven\'t been shown what else Square can do.';
+    } else {
+      educLine += ' They may genuinely believe Square is "just a card reader." A discovery call reframes the relationship.';
+    }
+    // Specific opener
+    educLine += '<div style="margin-top:4px;padding:4px 8px;background:rgba(0,106,255,0.08);border-radius:4px;font-size:10px;color:var(--blue-light);">💬 <em>"I was looking at your account and realised we\'ve never had a proper conversation about how your business has evolved. I\'d love 15 minutes to understand what\'s changed and whether there are tools you\'re not using that could help."</em></div>';
+    lines.push({type:'education', icon:'📚', text:educLine});
+  }
+  
+  // Failure of Responsiveness — declining volume + radio silence = they're solving problems without us
+  if (a.days >= 120 && a.velocity < -5) {
+    var gpvDropStr = 'A$' + Math.abs(Math.round((a.gpv - a.gpv9/0.75*1) * 1000000 / 1000)) + 'K';
+    var respLine = '<strong>Failure of Responsiveness:</strong> GPV is down <strong>' + a.velocity.toFixed(0) + '%</strong> and the last DM was <strong>' + a.days + ' days ago</strong>.';
+    if (a.velocity < -20) {
+      respLine += ' This is a significant decline happening without any AM engagement. If they\'re facing issues — hardware problems, competitor offers, business challenges — they\'re solving them without Square in the room.';
+    } else {
+      respLine += ' The decline is moderate but the silence is the real risk. Sellers who feel ignored during a rough patch are the most likely to leave.';
+    }
+    // Specific opener based on severity
+    if (a.velocity < -20) {
+      respLine += '<div style="margin-top:4px;padding:4px 8px;background:rgba(0,106,255,0.08);border-radius:4px;font-size:10px;color:var(--blue-light);">💬 <em>"I owe you a call — I noticed things have shifted in your business recently and I should have reached out sooner. What\'s been going on? I want to make sure Square is still working for you."</em></div>';
+    } else {
+      respLine += '<div style="margin-top:4px;padding:4px 8px;background:rgba(0,106,255,0.08);border-radius:4px;font-size:10px;color:var(--blue-light);">💬 <em>"Just checking in — I saw your volumes have dipped a bit. Is that seasonal, or has something changed? Happy to jump on a quick call."</em></div>';
+    }
+    lines.push({type:'responsive', icon:'⏰', text:respLine});
+  } else if (a.days >= 150 && a.days < 999) {
+    var respLine = '<strong>Responsiveness gap:</strong> <strong>' + a.days + ' days</strong> since last DM.';
+    if (a.velocity > 5) {
+      respLine += ' Interestingly, they\'re <em>growing</em> (+' + a.velocity.toFixed(0) + '%) — which means they\'re succeeding without hearing from you. That\'s great for now, but it means someone else could step in and take credit for the momentum. A call positions you as the partner who noticed.';
+      respLine += '<div style="margin-top:4px;padding:4px 8px;background:rgba(0,106,255,0.08);border-radius:4px;font-size:10px;color:var(--blue-light);">💬 <em>"I\'ve been watching your numbers and your growth has been impressive — up ' + a.velocity.toFixed(0) + '% recently. I wanted to check in and see if there\'s anything we can do to support that momentum."</em></div>';
+    } else {
+      respLine += ' Even stable sellers need to hear from their AM. Silence reads as indifference — and when a competitor calls, they\'ll be the ones who seem to care.';
+      respLine += '<div style="margin-top:4px;padding:4px 8px;background:rgba(0,106,255,0.08);border-radius:4px;font-size:10px;color:var(--blue-light);">💬 <em>"Hi — it\'s been a while since we connected. I wanted to make sure everything\'s running smoothly and see if there\'s anything on your end I can help with."</em></div>';
+    }
+    lines.push({type:'responsive', icon:'⏰', text:respLine});
+  }
+  
+  // ============================================================
+  // 2. STICKINESS ASSESSMENT — how embedded is this seller?
+  // ============================================================
+  
+  var stickyLine = '';
+  if (prodCount >= 5 && a.contract && a.saasAr > 0) {
+    // Deeply embedded — low churn risk, frame positively
+    stickyLine = '🔒 <strong>High stickiness:</strong> ' + prodCount + ' products, contracted, A$' + (a.saasAr).toLocaleString('en-AU',{maximumFractionDigits:0}) + ' in SaaS AR. This seller is deeply embedded in Square. Churn risk is low — focus on satisfaction and growth, not retention.';
+  } else if (prodCount === 0 && !a.contract && a.saasAr === 0) {
+    // Payments-only, no contract, no SaaS — highest flight risk
+    stickyLine = '⚠️ <strong>Low stickiness:</strong> Payments-only, no contract, zero SaaS revenue. This seller could switch to a competitor with <strong>zero friction</strong> — there\'s nothing tying them to Square beyond habit.';
+    if (a.gpv > 0.5) {
+      stickyLine += ' At ' + gpvStr + ' GPV, that\'s a meaningful loss. The single best retention move is getting them onto <strong>any</strong> SaaS product — even one creates switching cost.';
+    }
+  } else if (prodCount <= 2 && !a.contract) {
+    stickyLine = '🔓 <strong>Moderate stickiness:</strong> ' + (prodCount === 0 ? 'No add-on products' : 'Only ' + prodCount + ' product' + (prodCount > 1 ? 's' : '')) + ' and no contract. Switching cost is low.';
+    if (a.saasAr > 0) {
+      stickyLine += ' They do generate A$' + (a.saasAr).toLocaleString('en-AU',{maximumFractionDigits:0}) + ' in SaaS AR, which helps — but a contract conversation would significantly reduce flight risk.';
+    } else {
+      stickyLine += ' Every product you add creates a reason to stay. Start with the one that solves their biggest daily pain point.';
+    }
+  }
+  
+  if (stickyLine) {
+    lines.push({type:'sticky', icon:'', text:stickyLine});
+  }
+  
+  // ============================================================
+  // 3. WHAT'S AT STAKE — specific, not generic
+  // ============================================================
+  
+  // Only show for meaningful accounts, and frame around the seller's business, not AM comp
+  if (a.risk === 'at-risk' || (a.velocity < -15 && a.gpv > 0.3)) {
+    var stakeLine = '<strong>What\'s at stake:</strong> ';
+    var arStr = 'A$' + (a.ar).toLocaleString('en-AU',{maximumFractionDigits:0});
+    
+    if (sellerPctGpv >= 2.0) {
+      stakeLine += 'This is <strong>' + sellerPctGpv.toFixed(1) + '% of your total portfolio GPV</strong> and ' + arStr + ' in AR. Losing this account would be visible in your numbers.';
+    } else if (a.gpv >= 1.0) {
+      stakeLine += gpvStr + ' in GPV and ' + arStr + ' in AR. A top-quartile account in your book.';
+    } else {
+      stakeLine += gpvStr + ' in GPV. Not your largest account, but ' + arStr + ' in AR adds up — and every churned seller makes the next one easier to lose.';
+    }
+    
+    // Contract multiplier — 1.1x on in-quarter GPV and AR (quota is quarterly)
+    // Per AM Comp SMB Metrics Explainer: multiplier applies to both GPV Growth & Retention (60%) and AR Growth (40%)
+    if (!a.contract && a.gpv > 0.5) {
+      var qtrGpv = a.gpv / 4;
+      var qtrGpvStr = (qtrGpv * 1000000) >= 1000000 ? 'A$' + qtrGpv.toFixed(2) + 'M' : 'A$' + (qtrGpv * 1000).toFixed(0) + 'K';
+      var qtrGpvUplift = Math.round(qtrGpv * 0.1 * 1000000 / 1000);
+      var qtrArUplift = Math.round(a.ar / 4 * 0.1);
+      stakeLine += ' <span style="color:var(--yellow);">Getting them contracted would add the <strong>1.1x multiplier</strong> on their in-quarter GPV (~' + qtrGpvStr + '/qtr → ~A$' + qtrGpvUplift + 'K GPV attainment uplift) and on AR wins (~A$' + qtrArUplift + '/qtr AR uplift). The multiplier applies to both your GPV Growth & Retention and AR Growth metrics.</span>';
+    }
+    
+    lines.push({type:'stake', icon:'📊', text:stakeLine});
+  }
+  
+  // ============================================================
+  // 4. CATEGORY-SPECIFIC RISK SIGNALS — what to actually ask about
+  // ============================================================
+  
+  if (a.cat === 'food' && a.velocity < -5 && a.gpv > 0.3) {
+    var fbLine = '<strong>F&B-specific signals to probe:</strong> ';
+    if (a.avgTicket && a.avgTicket < 20) {
+      fbLine += 'At A$' + a.avgTicket.toFixed(0) + ' avg ticket, this is likely a café/QSR — check if they\'re losing foot traffic to nearby competitors or if delivery fees are cutting into margins.';
+    } else if (a.avgTicket && a.avgTicket >= 40) {
+      fbLine += 'Premium dining at A$' + a.avgTicket.toFixed(0) + ' avg ticket — declining volume here often means fewer covers, not lower spend. Ask about staffing challenges or reservation no-shows.';
+    } else {
+      fbLine += 'Common F&B churn drivers: 3P delivery fee pressure, split payment frustrations, hardware reliability issues, or a competitor offering lower rates.';
+    }
+    fbLine += '<div style="margin-top:4px;padding:4px 8px;background:rgba(0,106,255,0.08);border-radius:4px;font-size:10px;color:var(--blue-light);">💬 <em>"I know the hospitality space has been tough lately. What\'s been the biggest challenge for your business this quarter?"</em></div>';
+    lines.push({type:'category', icon:'🍽️', text:fbLine});
+  }
+  
+  if (a.cat === 'retail' && a.velocity < -10 && a.gpv > 0.3) {
+    var rtlLine = '<strong>Retail-specific signals:</strong> ';
+    if (!a.products.some(function(p){ return p === 'Square Online Store' || p === 'Square Online Checkout'; })) {
+      rtlLine += 'No online channel — if foot traffic is declining, they have no fallback revenue stream. This is both a risk factor and an opportunity.';
+    } else {
+      rtlLine += 'They have online but in-store is declining. Ask whether online is cannibalising in-store or if it\'s a broader traffic issue.';
+    }
+    lines.push({type:'category', icon:'🛍️', text:rtlLine});
+  }
+  
+  if (a.cat === 'beauty' && a.velocity < -10 && a.gpv > 0.2) {
+    var beautyLine = '<strong>Beauty-specific signals:</strong> ';
+    if (!a.products.some(function(p){ return p === 'Appointments' || p === 'Appointments Plus'; })) {
+      beautyLine += 'No Appointments product — they\'re likely managing bookings manually or through a competitor tool (Fresha, Timely). That competitor tool is the biggest churn risk because it becomes the system of record.';
+    } else {
+      beautyLine += 'They\'re on Appointments, so they\'re embedded. Declining volume likely means fewer clients, not a platform issue. Ask about client retention and marketing.';
+    }
+    lines.push({type:'category', icon:'💅', text:beautyLine});
+  }
+  
+  // ============================================================
+  // 5. PEER CONTEXT — are they an outlier or is the category struggling?
+  // ============================================================
+  
+  if (a.velocity < -10 && catDecliningPct > 0) {
+    var peerLine = '';
+    if (catDecliningPct >= 25) {
+      peerLine = '<strong>Category trend:</strong> ' + catDecliningPct + '% of ' + catLabel + ' sellers in the portfolio are also declining. This may be a market-wide issue (seasonality, economic conditions) rather than a seller-specific problem. Acknowledge the environment before problem-solving.';
+    } else {
+      peerLine = '<strong>Outlier alert:</strong> Only ' + catDecliningPct + '% of ' + catLabel + ' sellers are declining — this seller is bucking the trend. The issue is likely specific to their business. Dig deeper.';
+    }
+    lines.push({type:'peer', icon:'👥', text:peerLine});
+  }
+  
+  if (lines.length === 0) return '';
+  
+  // Determine border color based on severity
+  var borderColor = 'var(--red)';
+  var headerIcon = 'fa-shield-alt';
+  if (lines.length === 1 && lines[0].type === 'sticky' && prodCount >= 3) {
+    borderColor = 'var(--yellow)';
+  }
+  
+  return '<div style="background:var(--bg3);border-radius:8px;padding:12px;margin:8px 0;border-left:3px solid ' + borderColor + ';">' +
+    '<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;"><i class="fas ' + headerIcon + '" style="color:' + borderColor + ';margin-right:4px;"></i>Retention Intelligence</div>' +
+    lines.map(function(l){ return '<div style="padding:6px 0;font-size:11px;color:var(--text);line-height:1.6;border-bottom:1px solid rgba(30,51,71,0.2);">' + l.icon + (l.icon ? ' ' : '') + l.text + '</div>'; }).join('') +
+  '</div>';
+}
+
+function nextBestActions(a) {
+  var actions = [];
+  
+  // === URGENT (red) — ownership & risk ===
+  if (a.days >= 180) actions.push({pri:1, type:'urgent', icon:'🔴', text:'No DM in ' + a.days + ' days — at risk of release from your book. Call this week.', category:'Retain Ownership'});
+  else if (a.days >= 150) actions.push({pri:2, type:'urgent', icon:'🟠', text:'Last DM was ' + a.days + ' days ago — 6-month window closing. Schedule outreach.', category:'Retain Ownership'});
+  
+  if (a.velocity < -20) actions.push({pri:1, type:'urgent', icon:'🔴', text:'GPV declining ' + a.velocity.toFixed(0) + '% — investigate if seller is switching providers or facing business issues.', category:'Retention'});
+  else if (a.velocity < -10) actions.push({pri:3, type:'urgent', icon:'🟠', text:'Volume softening (' + a.velocity.toFixed(0) + '%) — worth a check-in to understand what\'s changed.', category:'Retention'});
+  
+  if (a.contract && a.days >= 90) actions.push({pri:2, type:'urgent', icon:'🔴', text:'Contract account with no recent DM — prioritize renewal conversation.', category:'Retention'});
+  
+  if (a.locations === 0) actions.push({pri:3, type:'urgent', icon:'🟠', text:'No active locations on file — verify if business is still operating.', category:'Data Quality'});
+  
+  // === GROW (blue) — product opportunities ===
+  var prods = a.products.filter(function(p){ return p && p !== 'UNKNOWN' && p !== 'Register POS' && p !== 'Register Terminal'; });
+  var prodSet = new Set(prods);
+  
+  // Category-specific product recommendations
+  if (a.cat === 'food' && !prodSet.has('Square Online Store') && !prodSet.has('Square Online Checkout') && a.gpv > 0.3)
+    actions.push({pri:4, type:'grow', icon:'📈', text:'Online Store — capture delivery/pickup orders. High adoption among food sellers at this GPV.', category:'Product: Online'});
+  
+  if (a.cat === 'food' && !prodSet.has('Loyalty') && a.gpv > 0.5)
+    actions.push({pri:5, type:'grow', icon:'📈', text:'Loyalty — drives repeat visits. Strong fit for food businesses above A$500K.', category:'Product: Loyalty'});
+  
+  if (a.cat === 'food' && !prodSet.has('Square Kitchen Display') && prodSet.has('Square for Restaurants') && a.locations > 1)
+    actions.push({pri:6, type:'grow', icon:'📈', text:'Kitchen Display System — natural add-on for multi-location restaurants already on RST POS.', category:'Product: KDS'});
+  
+  if (a.cat === 'retail' && !prodSet.has('Square Online Store') && !prodSet.has('Square Online Checkout'))
+    actions.push({pri:4, type:'grow', icon:'📈', text:'Online Store — retail sellers without eCommerce are missing omnichannel revenue.', category:'Product: Online'});
+  
+  if (a.cat === 'retail' && !prodSet.has('Square for Retail') && a.gpv > 0.5)
+    actions.push({pri:5, type:'grow', icon:'📈', text:'Retail POS — purpose-built for inventory management, purchase orders, vendor management.', category:'Product: Retail POS'});
+  
+  if (a.cat === 'beauty' && !prodSet.has('Appointments') && !prodSet.has('Appointments Plus'))
+    actions.push({pri:4, type:'grow', icon:'📈', text:'Appointments — #1 product for beauty & wellness. Reduces no-shows, streamlines booking.', category:'Product: Appointments'});
+  
+  if (a.cat === 'services' && !prodSet.has('Invoices'))
+    actions.push({pri:5, type:'grow', icon:'📈', text:'Invoices — services businesses benefit from quoting and billing tools.', category:'Product: Invoices'});
+  
+  if (!prodSet.has('Marketing') && !prodSet.has('Text Message Marketing') && a.gpv > 1.0)
+    actions.push({pri:6, type:'grow', icon:'📈', text:'Marketing (email/SMS) — at A$' + a.gpv.toFixed(1) + 'M GPV, marketing tools drive measurable repeat business.', category:'Product: Marketing'});
+  
+  if (!prodSet.has('Afterpay') && a.cat === 'retail')
+    actions.push({pri:6, type:'grow', icon:'📈', text:'Afterpay — retail sellers see higher avg ticket with BNPL. Check if already enabled.', category:'Product: Afterpay'});
+  
+  if (prods.length === 0)
+    actions.push({pri:4, type:'grow', icon:'📈', text:'No add-on products yet — blank canvas. Start with the highest-fit product for ' + a.cat + '.', category:'Product: Any'});
+  
+  // Peer-driven recommendations
+  var similar = findSimilarSellers(a, accounts);
+  if (similar.length >= 2) {
+    var myProdSet = new Set(prods);
+    var peerProds = {};
+    similar.forEach(function(s) {
+      s.products.filter(function(p){return p && p!=='UNKNOWN' && p!=='Register POS' && p!=='Register Terminal';}).forEach(function(p) {
+        if (!myProdSet.has(p)) peerProds[p] = (peerProds[p]||0) + 1;
+      });
+    });
+    var topGap = Object.entries(peerProds).sort(function(a,b){return b[1]-a[1];})[0];
+    if (topGap && topGap[1] >= 2) {
+      actions.push({pri:5, type:'grow', icon:'👥', text:topGap[0] + ' — used by ' + topGap[1] + '/' + similar.length + ' similar ' + a.cat + ' sellers. Peer proof point for the conversation.', category:'Peer Insight'});
+    }
+  }
+  
+  // Velocity-based growth
+  if (a.velocity > 15) actions.push({pri:6, type:'grow', icon:'⚡', text:'Seller is accelerating (+' + a.velocity.toFixed(0) + '%) — great time to discuss growth tools while momentum is high.', category:'Timing'});
+  
+  // === CELEBRATE (green) — relationship building ===
+  var ms = sellerMilestones(a);
+  ms.forEach(function(m) {
+    actions.push({pri:7, type:'celebrate', icon:m.icon, text:m.text + ' — great reason to reach out and strengthen the relationship.', category:'Milestone'});
+  });
+  
+  if (a.velocity > 25) actions.push({pri:7, type:'celebrate', icon:'🎉', text:'Fastest growth period — acknowledge their success. "I noticed your volume is up ' + a.velocity.toFixed(0) + '%..."', category:'Recognition'});
+  
+  if (prods.length >= 5) actions.push({pri:8, type:'celebrate', icon:'🌟', text:'Power user with ' + prods.length + ' products — consider for case study, referral program, or beta testing.', category:'Advocacy'});
+  
+  // Feature awareness actions
+  var matched = matchFeatures(a);
+  if (matched.length > 0) {
+    var topFeature = matched[0];
+    actions.push({pri:5, type:'grow', icon:'🆕', text:topFeature.name + ' just shipped — relevant to this seller. Mention it: "' + topFeature.talk.substring(0, 80) + '..."', category:'Feature News'});
+  }
+  
+  // Sort by priority and cap at 5
+  actions.sort(function(a,b){ return a.pri - b.pri; });
+  return actions.slice(0, 5);
+}
+
+function nextBestActionsHtml(a) {
+  var actions = nextBestActions(a);
+  if (actions.length === 0) return '';
+  
+  var typeColors = {urgent:'var(--red)',grow:'var(--blue-light)',celebrate:'var(--green)'};
+  var typeBgs = {urgent:'var(--red-dim)',grow:'var(--blue-dim)',celebrate:'var(--green-dim)'};
+  var typeLabels = {urgent:'URGENT',grow:'GROW',celebrate:'CELEBRATE'};
+  
+  var rows = actions.map(function(act) {
+    return '<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid rgba(30,51,71,0.3);">' +
+      '<span style="font-size:9px;padding:2px 6px;border-radius:8px;font-weight:700;white-space:nowrap;background:' + typeBgs[act.type] + ';color:' + typeColors[act.type] + ';">' + typeLabels[act.type] + '</span>' +
+      '<span style="font-size:10px;color:var(--text);line-height:1.4;">' + act.icon + ' ' + act.text + '</span>' +
+      '<span style="font-size:8px;color:var(--text3);white-space:nowrap;margin-left:auto;">' + act.category + '</span>' +
+    '</div>';
+  }).join('');
+  
+  return '<div style="background:var(--bg2);border-radius:6px;padding:12px;margin:8px 0;border-left:3px solid var(--green);">' +
+    '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;"><i class="fas fa-bolt" style="color:var(--yellow);margin-right:4px;"></i>Next Best Actions</div>' +
+    rows +
+  '</div>';
+}
+
+function sellerNarrative(a) {
+  var sections = [];
+  
+  // === WHO THEY ARE ===
+  var catLabel = {food:'food & beverage',retail:'retail',beauty:'beauty & wellness',services:'services',fitness:'fitness',events:'events',drinks:'café & drinks'}[a.cat] || a.cat;
+  var gpvExact = (a.gpv * 1000000);
+  var gpvStr = gpvExact >= 1000000 ? 'A$' + (gpvExact/1000000).toFixed(2) + 'M' : 'A$' + (gpvExact/1000).toFixed(0) + 'K';
+  var arStr = a.ar >= 1000 ? 'A$' + (a.ar/1000).toFixed(1) + 'K' : 'A$' + a.ar.toFixed(0);
+  var ticketStr = 'A$' + (a.avgTicket||0).toFixed(2);
+  
+  // Business model inference from avg ticket + category
+  var modelInference = '';
+  if (a.cat === 'food' && a.avgTicket < 15) modelInference = 'Their avg ticket of ' + ticketStr + ' points to a high-frequency counter-service model (café, bakery, quick-service) — speed and reliability at the register matter most.';
+  else if (a.cat === 'food' && a.avgTicket >= 15 && a.avgTicket < 40) modelInference = 'At ' + ticketStr + ' avg ticket, this looks like a casual dining operation — table turnover and order management are key.';
+  else if (a.cat === 'food' && a.avgTicket >= 40) modelInference = 'A ' + ticketStr + ' avg ticket suggests premium dining, catering, or events — high-touch service where presentation and experience matter.';
+  else if (a.cat === 'retail' && a.avgTicket < 30) modelInference = 'Low avg ticket (' + ticketStr + ') suggests high-volume convenience or impulse retail — checkout speed and inventory management are priorities.';
+  else if (a.cat === 'retail' && a.avgTicket >= 30) modelInference = 'At ' + ticketStr + ' avg ticket, this is a considered-purchase retailer — product knowledge, customer relationships, and omnichannel matter.';
+  else if (a.cat === 'beauty') modelInference = 'At ' + ticketStr + ' per service, ' + (a.avgTicket > 80 ? 'this is a premium salon/clinic — client retention and rebooking rates drive the business.' : 'booking efficiency and reducing no-shows directly impact revenue.');
+  else if (a.cat === 'services') modelInference = 'Avg ticket of ' + ticketStr + ' — ' + (a.avgTicket > 100 ? 'this is a high-value services business where quoting accuracy and invoicing matter.' : 'a volume services operation where scheduling and payment simplicity drive efficiency.');
+  else if (a.avgTicket > 0) modelInference = 'Avg transaction is ' + ticketStr + '.';
+  
+  // Location context
+  var locContext = '';
+  if (a.locations > 3) locContext = 'With ' + a.locations + ' active locations' + (a.city ? ' based around ' + a.city : '') + ', they\'re operating at chain scale — consistency across sites, centralised reporting, and multi-location management are likely pain points.';
+  else if (a.locations > 1) locContext = a.locations + ' locations' + (a.city ? ' in the ' + a.city + ' area' : '') + ' — they\'re growing beyond a single site, which means they\'ll start needing tools that work across locations.';
+  else if (a.city) locContext = 'Single location in ' + a.city + (a.state ? ', ' + a.state : '') + '.';
+  
+  var identityLine = '<strong>' + a.name + '</strong> is a ' + catLabel + ' business' + (a.tenure > 0 ? ' that\'s been with Square for <strong>' + (a.tenure/12).toFixed(1) + ' years</strong>' : '') + '.';
+  sections.push(identityLine + ' ' + locContext);
+  
+  // === THE NUMBERS THAT MATTER ===
+  var numbersLines = [];
+  
+  // GPV with context
+  var peerPct = 100 - a.peerRank;
+  if (peerPct <= 5) numbersLines.push('They\'re processing <strong>' + gpvStr + ' annually</strong> — that puts them in the <strong>top ' + peerPct + '%</strong> of all ' + a.cat + ' sellers in your portfolio. This is one of your most valuable accounts.');
+  else if (peerPct <= 25) numbersLines.push('At <strong>' + gpvStr + ' annual GPV</strong>, they\'re in the top quarter of ' + a.cat + ' sellers (top ' + peerPct + '%). A strong performer worth investing time in.');
+  else if (a.peerRank < 50) numbersLines.push('Processing <strong>' + gpvStr + ' annually</strong> — below the median for ' + a.cat + ' sellers. There may be room to grow if they\'re splitting volume with another provider.');
+  else numbersLines.push('At <strong>' + gpvStr + ' annual GPV</strong>, they\'re in the lower half of ' + a.cat + ' sellers. Worth understanding if this is their full volume or if they\'re using another provider too.');
+  
+  // Revenue
+  numbersLines.push('They\'re generating <strong>' + arStr + ' in annual revenue</strong> for Square.');
+  
+  // Velocity with REAL numbers
+  if (a.gpv9 && a.gpv) {
+    var gpv9Str = (a.gpv9 * 1000000) >= 1000000 ? 'A$' + (a.gpv9).toFixed(2) + 'M' : 'A$' + (a.gpv9*1000).toFixed(0) + 'K';
+    if (a.velocity > 15) numbersLines.push('<span style="color:var(--green);">📈 <strong>Growing fast.</strong></span> Their trailing 9-month GPV is <strong>' + gpv9Str + '</strong> vs <strong>' + gpvStr + '</strong> annualised — that\'s <strong>+' + a.velocity.toFixed(0) + '% acceleration</strong>. They\'re likely expanding (new location? more customers? higher prices?) — ask what\'s driving it and how you can support the momentum.');
+    else if (a.velocity > 5) numbersLines.push('<span style="color:var(--green);">📈 Healthy growth.</span> 9-month trailing at <strong>' + gpv9Str + '</strong> vs <strong>' + gpvStr + '</strong> annualised (+' + a.velocity.toFixed(0) + '%). Business is trending in the right direction.');
+    else if (a.velocity < -15) numbersLines.push('<span style="color:var(--red);">📉 <strong>Volume is dropping.</strong></span> 9-month trailing is <strong>' + gpv9Str + '</strong> vs <strong>' + gpvStr + '</strong> annualised — that\'s <strong>' + a.velocity.toFixed(0) + '% decline</strong>. This needs a conversation: are they facing competition? Foot traffic issues? Seasonal? Or switching providers?');
+    else if (a.velocity < -5) numbersLines.push('<span style="color:var(--red);">📉 Softening.</span> 9-month at <strong>' + gpv9Str + '</strong> vs <strong>' + gpvStr + '</strong> annualised (' + a.velocity.toFixed(0) + '%). Not alarming yet, but worth monitoring.');
+    else numbersLines.push('Volume is <strong>stable</strong> — 9-month trailing at <strong>' + gpv9Str + '</strong> vs <strong>' + gpvStr + '</strong> annualised.');
+  }
+  
+  // YoY
+  if (a.yoy > 10) numbersLines.push('Year-over-year they\'re up <strong>+' + a.yoy.toFixed(1) + '%</strong> — you can reference this: <em>"Your business has grown ' + a.yoy.toFixed(0) + '% year on year — that\'s impressive."</em>');
+  else if (a.yoy < -10) numbersLines.push('YoY is <strong>' + a.yoy.toFixed(1) + '%</strong> — worth acknowledging sensitively: <em>"I noticed things have shifted a bit this year — what\'s been going on?"</em>');
+  
+  sections.push(numbersLines.join(' '));
+  
+  // === BUSINESS MODEL ===
+  if (modelInference) sections.push(modelInference);
+  
+  // === PRODUCT STORY ===
+  var prods = a.products.filter(function(p){ return p && p !== 'UNKNOWN' && p !== 'Register POS' && p !== 'Register Terminal'; });
+  var prodLines = [];
+  
+  if (prods.length >= 5) {
+    prodLines.push('They\'re a <strong>power user</strong> with ' + prods.length + ' Square products active: ' + prods.join(', ') + '. This seller is deeply embedded — focus on making sure everything is working well rather than pushing more products.');
+  } else if (prods.length >= 2) {
+    prodLines.push('Currently using <strong>' + prods.join(', ') + '</strong>. They\'ve shown willingness to adopt beyond basic POS — the next product conversation should feel natural.');
+  } else if (prods.length === 1) {
+    prodLines.push('Only using <strong>' + prods[0] + '</strong> beyond basic POS. There\'s significant room to expand their Square footprint.');
+  } else {
+    prodLines.push('They\'re on <strong>free POS only</strong> — no SaaS or add-on products. This is either a seller who hasn\'t been shown what\'s available, or one who\'s getting what they need from the basics. A discovery conversation would clarify which.');
+  }
+  
+  // Specific product gaps with REASONING not just "X is a fit"
+  var prodSet = new Set(prods);
+  var hasOnline = prodSet.has('Square Online Store') || prodSet.has('Square Online Checkout');
+  var hasLoyalty = prodSet.has('Loyalty');
+  var hasMarketing = prodSet.has('Marketing') || prodSet.has('Text Message Marketing');
+  var hasAppts = prodSet.has('Appointments') || prodSet.has('Appointments Plus');
+  var hasRST = prodSet.has('Square for Restaurants');
+  var hasRTL = prodSet.has('Square for Retail');
+  var hasKDS = prodSet.has('Square Kitchen Display');
+  
+  if (a.cat === 'food' && !hasOnline && a.gpv > 0.3) prodLines.push('💡 <strong>No online ordering.</strong> For a ' + catLabel + ' business doing ' + gpvStr + ', even capturing 5-10% of orders online could mean A$' + ((a.gpv * 0.07) * 1000000 / 1000).toFixed(0) + 'K in incremental volume. Ask: <em>"Do customers ever ask if they can order ahead or get delivery?"</em>');
+  if (a.cat === 'food' && hasRST && !hasKDS && a.locations > 1) prodLines.push('💡 <strong>Using Restaurants POS but no Kitchen Display.</strong> With ' + a.locations + ' locations, kitchen communication is probably a bottleneck. KDS eliminates paper tickets and reduces order errors.');
+  if (a.cat === 'food' && !hasLoyalty && a.gpv > 0.5 && a.avgTicket < 25) prodLines.push('💡 <strong>No loyalty program.</strong> At ' + ticketStr + ' avg ticket with high frequency, a loyalty program could increase visit frequency by 15-20%. Ask: <em>"Do you see a lot of regulars? How do you reward them today?"</em>');
+  if (a.cat === 'retail' && !hasOnline) prodLines.push('💡 <strong>No online presence.</strong> Retail without eCommerce is leaving money on the table. Ask: <em>"Do customers ever ask if they can buy from you online?"</em>');
+  if (a.cat === 'beauty' && !hasAppts) prodLines.push('💡 <strong>No Appointments.</strong> For beauty & wellness, this is the #1 product — reduces no-shows (which cost the avg salon A$5-10K/year) and lets clients book 24/7.');
+  if (!hasMarketing && a.gpv > 1.0 && (hasLoyalty || prods.length >= 3)) prodLines.push('💡 <strong>No Marketing tools.</strong> They\'re already engaged with Square products — email/SMS campaigns could drive A$' + ((a.gpv * 0.03) * 1000000 / 1000).toFixed(0) + 'K+ in repeat revenue based on industry benchmarks.');
+  
+  if (prodLines.length) sections.push(prodLines.join(' '));
+  
+  // === RELATIONSHIP CONTEXT ===
+  var relLines = [];
+  if (a.contract) relLines.push('📋 <strong>Contract account.</strong> This is a committed seller — they\'ve chosen to partner with Square formally. Treat renewal conversations as strategic check-ins, not sales pitches.');
+  if (a.tenure >= 60) relLines.push('🏆 <strong>' + (a.tenure/12).toFixed(0) + '-year relationship.</strong> This is a long-term partner. They\'ve seen Square evolve — ask what\'s changed for their business and what they need next.');
+  else if (a.tenure >= 36) relLines.push('This is a <strong>mature relationship</strong> (' + (a.tenure/12).toFixed(0) + ' years). They trust Square — lean into advisory mode.');
+  
+  if (a.days >= 150 && a.days < 999) relLines.push('⚠️ <strong>Last DM was ' + a.days + ' days ago.</strong> You\'re approaching the 6-month ownership window. A call now isn\'t just good practice — it protects your book.');
+  else if (a.days >= 999) relLines.push('⚠️ <strong>Activity data shows 999 days</strong> — this is likely a data issue (merchant token mismatch). Check SFDC for actual contact history before reaching out.');
+  
+  if (relLines.length) sections.push(relLines.join(' '));
+  
+  return sections.join('</p><p style="margin-top:8px;">');
+}
+
+// Milestone detection
+function sellerMilestones(a) {
+  var milestones = [];
+  if (a.tenure === 12) milestones.push({icon:'🎂', text:'1-year anniversary with Square!'});
+  if (a.tenure === 24) milestones.push({icon:'🎂', text:'2-year anniversary with Square!'});
+  if (a.tenure === 36) milestones.push({icon:'🎉', text:'3-year anniversary with Square!'});
+  if (a.tenure === 48) milestones.push({icon:'🎉', text:'4-year anniversary with Square!'});
+  if (a.tenure === 60) milestones.push({icon:'🏆', text:'5-year anniversary with Square!'});
+  if (a.tenure > 60 && a.tenure % 12 === 0) milestones.push({icon:'🏆', text:(a.tenure/12) + '-year anniversary with Square!'});
+  if (a.gpv >= 1.0 && a.gpv9 < 1.0) milestones.push({icon:'📈', text:'GPV just crossed A$1M annualized!'});
+  if (a.gpv >= 5.0 && a.gpv9 < 5.0) milestones.push({icon:'🚀', text:'GPV just crossed A$5M annualized!'});
+  if (a.velocity > 20) milestones.push({icon:'⚡', text:'Fastest growing period — volume up ' + a.velocity.toFixed(0) + '%'});
+  if (a.products.filter(function(p){return p && p!=='UNKNOWN' && p!=='Register POS' && p!=='Register Terminal';}).length >= 5) milestones.push({icon:'🌟', text:'Power user — 5+ Square products adopted'});
+  return milestones;
+}
+
+
+function findSimilarSellers(a, allAccounts) {
+  var similar = allAccounts.filter(function(s) {
+    return s.name !== a.name && s.cat === a.cat && 
+           s.gpv >= a.gpv * 0.5 && s.gpv <= a.gpv * 2.0;
+  });
+  // Prefer same state
+  similar.sort(function(x,y) {
+    var xSameState = x.state === a.state ? 1 : 0;
+    var ySameState = y.state === a.state ? 1 : 0;
+    if (xSameState !== ySameState) return ySameState - xSameState;
+    return Math.abs(x.gpv - a.gpv) - Math.abs(y.gpv - a.gpv);
+  });
+  return similar.slice(0, 4);
+}
+
+function similarSellersHtml(a) {
+  var similar = findSimilarSellers(a, accounts);
+  if (similar.length === 0) return '';
+  
+  // Find products that similar sellers have but this one doesn't
+  var myProds = new Set(a.products.filter(function(p){return p && p!=='UNKNOWN' && p!=='Register POS' && p!=='Register Terminal';}));
+  var peerProds = {};
+  similar.forEach(function(s) {
+    s.products.filter(function(p){return p && p!=='UNKNOWN' && p!=='Register POS' && p!=='Register Terminal';}).forEach(function(p) {
+      if (!myProds.has(p)) peerProds[p] = (peerProds[p]||0) + 1;
+    });
+  });
+  var topGaps = Object.entries(peerProds).sort(function(a,b){return b[1]-a[1];}).slice(0,3);
+  
+  var rows = similar.map(function(s) {
+    var sProds = s.products.filter(function(p){return p && p!=='UNKNOWN' && p!=='Register POS' && p!=='Register Terminal';});
+    return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);">' +
+      '<span style="flex:1;font-size:10px;color:var(--text);font-weight:600;min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+s.name+'">'+s.name+'</span>' +
+      '<span style="font-size:9px;color:var(--text3);width:60px;">A$'+s.gpv.toFixed(2)+'M</span>' +
+      '<span style="font-size:9px;color:'+(s.velocity>5?'var(--green)':s.velocity<-5?'var(--red)':'var(--text3)')+';width:40px;">'+(s.velocity>0?'+':'')+s.velocity.toFixed(0)+'%</span>' +
+      '<span style="font-size:9px;color:var(--text3);width:50px;">'+(s.city||'')+'</span>' +
+      '<span style="font-size:9px;color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+sProds.slice(0,3).join(', ')+'</span>' +
+    '</div>';
+  }).join('');
+  
+  var gapHtml = topGaps.length ? '<div style="margin-top:6px;font-size:10px;color:var(--yellow);">💡 ' + topGaps.map(function(g){return '<strong>'+g[0]+'</strong> (used by '+g[1]+'/'+similar.length+' peers)';}).join(', ') + ' — products similar sellers use that this one doesn\'t.</div>' : '';
+  
+  return '<div style="background:var(--bg2);border-radius:6px;padding:10px;margin-top:8px;">' +
+    '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;"><i class="fas fa-users" style="color:var(--blue);margin-right:4px;"></i>Similar Sellers (same category, similar GPV)</div>' +
+    rows + gapHtml +
+  '</div>';
+}
+
+function peerBenchmarkHtml(a) {
+  const max = a.peerMax || 1;
+  const youPct = Math.min((a.gpv / max) * 100, 100);
+  const medPct = Math.min((a.peerMedian / max) * 100, 100);
+  const p25Pct = Math.min((a.peerP25 / max) * 100, 100);
+  const p75Pct = Math.min((a.peerP75 / max) * 100, 100);
+  const vsMedian = a.peerMedian > 0 ? ((a.gpv - a.peerMedian) / a.peerMedian * 100) : 0;
+  const vsLabel = vsMedian >= 0 ? '<span style="color:var(--green);">+' + vsMedian.toFixed(0) + '% vs median</span>' : '<span style="color:var(--red);">' + vsMedian.toFixed(0) + '% vs median</span>';
+  return '<div class="peer-bar">' +
+    '<span class="peer-label">P25</span>' +
+    '<div class="peer-track">' +
+      '<div style="position:absolute;left:' + p25Pct + '%;width:' + (p75Pct - p25Pct) + '%;height:100%;background:rgba(94,122,148,0.15);border-radius:4px;"></div>' +
+      '<div class="peer-marker peer-median" style="left:' + medPct + '%;"></div>' +
+      '<div class="peer-marker peer-you" style="left:' + youPct + '%;"></div>' +
+    '</div>' +
+    '<span class="peer-label">P75</span>' +
+  '</div>' +
+  '<div style="font-size:9px;color:var(--text2);margin-top:3px;">' +
+    '<span style="color:var(--blue-light);">●</span> This seller: A$' + a.gpv.toFixed(2) + 'M &bull; ' +
+    '<span style="color:var(--text3);">●</span> ' + a.cat + ' median: A$' + a.peerMedian.toFixed(2) + 'M &bull; ' +
+    vsLabel + ' &bull; Top ' + (100 - a.peerRank) + '% of ' + a.cat +
+  '</div>';
+}
+
+
+function makeSparkline(pts, w, h, positive) {
+  const min = Math.min(...pts), max = Math.max(...pts);
+  const range = max - min || 1;
+  const coords = pts.map((v,i) => {
+    const x = (i/(pts.length-1)) * w;
+    const y = h - ((v-min)/range) * (h-4) - 2;
+    return {x,y};
+  });
+  const path = coords.map((c,i) => (i===0?'M':'L')+c.x.toFixed(1)+','+c.y.toFixed(1)).join(' ');
+  const color = positive ? 'var(--green)' : 'var(--red)';
+  const last = coords[coords.length-1];
+  return '<svg class="sparkline-svg" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'"><path d="'+path+'" fill="none" stroke="'+color+'" stroke-width="1.5" stroke-linecap="round"/><circle cx="'+last.x.toFixed(1)+'" cy="'+last.y.toFixed(1)+'" r="2" fill="'+color+'"/></svg>';
+}
+
+function makeLargeSparkline(pts, positive) {
+  const w=200, h=50;
+  const months = ['Sep','Oct','Nov','Dec','Jan','Feb'];
+  const min = Math.min(...pts), max = Math.max(...pts);
+  const range = max - min || 1;
+  const coords = pts.map((v,i) => {
+    const x = 10 + (i/(pts.length-1)) * (w-20);
+    const y = 5 + (h-20) - ((v-min)/range) * (h-20);
+    return {x,y};
+  });
+  const path = coords.map((c,i) => (i===0?'M':'L')+c.x.toFixed(1)+','+c.y.toFixed(1)).join(' ');
+  const color = positive ? 'var(--green)' : 'var(--red)';
+  const dots = coords.map((c,i) => '<circle cx="'+c.x.toFixed(1)+'" cy="'+c.y.toFixed(1)+'" r="2.5" fill="'+color+'"/>').join('');
+  const labels = coords.map((c,i) => '<text x="'+c.x.toFixed(1)+'" y="'+(h-2)+'" fill="#5e7a94" font-size="7" text-anchor="middle" font-family="Inter">'+months[i]+'</text>').join('');
+  return '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'"><path d="'+path+'" fill="none" stroke="'+color+'" stroke-width="2" stroke-linecap="round"/>'+dots+labels+'</svg>';
+}
+
+let expandedRow = null;
+
+// Override renderTable
+const _origRenderTable = renderTable;
+renderTable = function() {
+  expandedRow = null;
+  const list = getFilteredAccounts();
+  const tbody = document.getElementById('tableBody');
+  const amNames = { antony:'AH', simran:'SS', pascale:'PD', liv:'LM', mitch:'ML', victoria:'VF', eitan:'ED', elena:'EK', emily:'EmD' };
+  tbody.innerHTML = list.map((a, idx) => {
+    const tierLabel = a.tier===1?'Tier 1':a.tier===2?'Tier 2':'Tier 3';
+    const tierClass = a.tier===1?'gpv-tier1':a.tier===2?'gpv-tier2':'gpv-tier3';
+    const healthColor = a.health>=70?'var(--green)':a.health>=40?'var(--yellow)':'var(--red)';
+    const riskLabel = a.risk==='at-risk'?'At-Risk':a.risk==='watch'?'Watch':'Healthy';
+    const riskClass = 'risk-'+a.risk;
+    const sparkHtml = makeSparkline(a.spark, 60, 20, a.yoy >= 0);
+    const sfUrl = a.sf ? 'https://squareinc.lightning.force.com/lightning/r/Account/' + a.sf + '/view' : '#';
+    return '<tr class="fade-in" onclick="toggleDetail('+idx+')" style="cursor:pointer;" id="row-'+idx+'">' +
+      '<td style="font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;" title="'+a.name+'">'+a.name+'</td>' +
+      '<td><span class="cat-icon cat-'+a.cat+'"><i class="fas '+catIcons[a.cat]+'"></i></span></td>' +
+      '<td><span class="gpv-badge '+tierClass+'">'+tierLabel+'</span></td>' +
+      '<td>'+sparkHtml+' '+velocityBadge(a.velocity)+'</td>' +
+      '<td style="font-weight:700;">$'+a.gpv.toFixed(1)+'M</td>' +
+      '<td class="'+(a.yoy>=0?'yoy-pos':'yoy-neg')+'" style="font-weight:600;">'+(a.yoy>=0?'+':'')+a.yoy+'%</td>' +
+      '<td style="font-size:10px;color:'+(a.days>=180?'var(--red)':a.days>=90?'var(--yellow)':a.days>=30?'var(--text2)':'var(--green)')+';font-weight:'+(a.days>=180?'700':'400')+';" title="'+(a.days>=180?'⚠ Past 6mo — at risk of release to eligible pool':a.days>=90?'Approaching 6mo DM window':'')+'">'+(a.lastProcessed||'—')+'</td>' +
+      '<td><div class="health-bar-wrap"><div class="health-bar-fill" style="width:'+a.health+'%;background:'+healthColor+';"></div></div></td>' +
+      '<td><span class="risk-flag '+riskClass+'" title="'+riskReason(a)+'">'+riskLabel+'</span></td>' +
+      '<td>'+(a.contract?'<span class="badge-contract" style="font-size:8px;">CONTRACT</span>':'<span style="font-size:8px;color:var(--text3);">Std</span>')+'</td>' +
+      '<td style="color:var(--text3);font-size:10px;">'+(amNames[a.am]||a.am)+'</td>' +
+      '<td><a class="sfdc-link" href="'+sfUrl+'" target="_blank" onclick="event.stopPropagation();" title="Open in Salesforce"><i class="fas fa-external-link-alt"></i></a></td>' +
+    '</tr>';
+  }).join('');
+  document.getElementById('tableCount').textContent = list.length + ' accounts';
+  document.getElementById('tableInfo').textContent = 'Showing ' + list.length + ' of ' + (currentAM==='all'?accounts.length:accounts.filter(a=>a.am===currentAM).length) + ' accounts';
+};
+
+function toggleDetail(idx) {
+  // Close any existing modal
+  var existing = document.getElementById('seller-modal-overlay');
+  if (existing) { existing.remove(); }
+  
+  var list = getFilteredAccounts();
+  var a = list[idx];
+  if (!a) return;
+  
+  var sfUrl = a.sf ? 'https://squareinc.lightning.force.com/lightning/r/Account/' + a.sf + '/view' : '#';
+  var starsVal = a.csatStars || 0;
+  var starsHtml = starsVal > 0 ? ('★'.repeat(Math.round(starsVal)) + '☆'.repeat(5 - Math.round(starsVal)) + ' (' + starsVal.toFixed(1) + ')') : '<span style="color:var(--text3)">No CSAT</span>';
+  var sparkLarge = makeLargeSparkline(a.spark, a.yoy >= 0);
+  var daysWarning = a.days >= 999 ? ' <span style="color:var(--orange);font-size:9px;" title="999 days may indicate merchant token mismatch">⚠ verify</span>' : '';
+  
+  var modalHtml = '<div class="seller-modal-overlay" id="seller-modal-overlay" onclick="if(event.target===this)closeModal()">' +
+    '<div class="seller-modal">' +
+      '<button class="seller-modal-close" onclick="closeModal()" title="Close"><i class="fas fa-times"></i></button>' +
+      
+      // Header
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">' +
+        '<div>' +
+          '<div style="font-size:20px;font-weight:800;color:var(--text);">' + a.name + '</div>' +
+          '<div style="font-size:11px;color:var(--text3);margin-top:4px;">' +
+            '<span style="text-transform:capitalize;">' + a.cat + '</span> &bull; ' +
+            (a.contract ? '<span class="badge-contract">CONTRACT</span>' : '<span class="badge-standard">STANDARD</span>') +
+            ' &bull; ' + a.tenure + ' months with Square' +
+            (a.city ? ' &bull; <i class="fas fa-map-marker-alt" style="color:var(--blue);margin:0 2px;"></i>' + a.city + (a.state ? ', ' + a.state : '') + (a.postcode ? ' ' + a.postcode : '') : '') +
+          '</div>' +
+        '</div>' +
+        '<div style="text-align:right;">' + sparkLarge + '</div>' +
+      '</div>' +
+      
+      // Milestones
+      (function(){
+        var ms = sellerMilestones(a);
+        return ms.length ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">' + ms.map(function(m){return '<span style="font-size:10px;background:var(--blue-dim);color:var(--blue-light);padding:3px 10px;border-radius:12px;font-weight:600;">'+m.icon+' '+m.text+'</span>';}).join('') + '</div>' : '';
+      })() +
+      
+      // Know Your Seller
+      '<div style="background:var(--bg3);border-radius:8px;padding:14px;margin-bottom:12px;border-left:3px solid var(--blue);">' +
+        '<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;"><i class="fas fa-lightbulb" style="color:var(--yellow);margin-right:4px;"></i>Know Your Seller</div>' +
+        '<div style="font-size:12px;color:var(--text);line-height:1.7;"><p>' + sellerNarrative(a) + '</p></div>' +
+      '</div>' +
+      
+      // Next Best Actions
+      nextBestActionsHtml(a) +
+      
+      // Feature News
+      featureNewsHtml(a) +
+      
+      // Retention Intelligence
+      churnRiskFraming(a) +
+      
+      // Metrics grid
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0;">' +
+        '<div style="background:var(--bg3);border-radius:6px;padding:12px;">' +
+          '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;">Annualized GPV</div>' +
+          '<div style="font-size:18px;font-weight:700;color:var(--blue-light);margin-top:4px;">A$' + (a.gpv*1000000).toLocaleString('en-AU',{maximumFractionDigits:0}) + '</div>' +
+        '</div>' +
+        '<div style="background:var(--bg3);border-radius:6px;padding:12px;">' +
+          '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;">Annualized AR</div>' +
+          '<div style="font-size:18px;font-weight:700;margin-top:4px;">A$' + (a.ar).toLocaleString('en-AU',{maximumFractionDigits:0}) + '</div>' +
+        '</div>' +
+        '<div style="background:var(--bg3);border-radius:6px;padding:12px;">' +
+          '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;">Avg Ticket</div>' +
+          '<div style="font-size:18px;font-weight:700;margin-top:4px;">A$' + (a.avgTicket||0).toFixed(2) + '</div>' +
+        '</div>' +
+        '<div style="background:var(--bg3);border-radius:6px;padding:12px;">' +
+          '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;">Active Locations</div>' +
+          '<div style="font-size:18px;font-weight:700;margin-top:4px;">' + a.locations + '</div>' +
+        '</div>' +
+      '</div>' +
+      
+      // Info tags
+      '<div style="display:flex;gap:14px;flex-wrap:wrap;margin:10px 0;">' +
+        '<div class="detail-tag"><i class="fas fa-clock"></i>Last contact ' + a.days + ' days ago' + daysWarning + '</div>' +
+        '<div class="detail-tag"><i class="fas fa-phone"></i>' + a.activities30d + ' activities (30d)</div>' +
+        '<div class="detail-tag"><i class="fas fa-star"></i><span class="stars">' + starsHtml + '</span></div>' +
+        '<div class="detail-tag"><i class="fas fa-chart-line"></i>YoY ' + (a.yoy>=0?'+':'') + a.yoy + '%</div>' +
+        (a.sellerClass ? '<div class="detail-tag"><i class="fas fa-layer-group"></i>' + a.sellerClass + '</div>' : '') +
+      '</div>' +
+      
+      // Velocity + Peer side by side
+      '<div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap;">' +
+        '<div style="flex:1;min-width:200px;background:var(--bg3);border-radius:6px;padding:12px;">' +
+          '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">GPV Velocity (9mo vs Annual)</div>' +
+          '<div style="display:flex;align-items:center;gap:8px;">' +
+            velocityBadge(a.velocity) +
+            '<span style="font-size:10px;color:var(--text2);">9mo: A$' + (a.gpv9||0).toFixed(2) + 'M vs Ann: A$' + a.gpv.toFixed(2) + 'M</span>' +
+          '</div>' +
+          '<div style="font-size:9px;color:var(--text3);margin-top:4px;">' +
+            (a.velocity > 10 ? 'Accelerating — seller is growing faster recently' :
+             a.velocity < -10 ? 'Decelerating — recent volume dropping, investigate' :
+             a.velocity < -50 ? 'Severe decline — possible provider switch or closure' :
+             'Stable trajectory') +
+          '</div>' +
+        '</div>' +
+        '<div style="flex:1;min-width:200px;background:var(--bg3);border-radius:6px;padding:12px;">' +
+          '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">Peer Benchmark (' + a.cat + ')</div>' +
+          peerBenchmarkHtml(a) +
+        '</div>' +
+      '</div>' +
+      
+      // Product Adoption
+      (function(){
+        var allProducts = [
+          {key:"Square Online Store",icon:"fa-globe",label:"Online"},{key:"Square for Restaurants",icon:"fa-utensils",label:"Restaurants"},
+          {key:"Square for Retail",icon:"fa-shopping-bag",label:"Retail POS"},{key:"Appointments",icon:"fa-calendar-check",label:"Appointments"},
+          {key:"Invoices",icon:"fa-file-invoice-dollar",label:"Invoices"},{key:"Loyalty",icon:"fa-heart",label:"Loyalty"},
+          {key:"Marketing",icon:"fa-bullhorn",label:"Marketing"},{key:"Team Management",icon:"fa-users",label:"Team Mgmt"},
+          {key:"Shifts",icon:"fa-clock",label:"Shifts"},{key:"Square Kitchen Display",icon:"fa-tv",label:"KDS"},
+          {key:"Afterpay",icon:"fa-credit-card",label:"Afterpay"},{key:"Gift Cards",icon:"fa-gift",label:"Gift Cards"},
+          {key:"Instant Deposit",icon:"fa-bolt",label:"Instant Dep"}
+        ];
+        var pills = '<span class="product-pill active"><i class="fas fa-cash-register"></i>POS</span>';
+        if(a.contract) pills += '<span class="product-pill active"><i class="fas fa-file-contract"></i>Contract</span>';
+        allProducts.forEach(function(p){
+          var has = a.products.indexOf(p.key) >= 0;
+          pills += '<span class="product-pill '+(has?'active':'inactive')+'"><i class="fas '+p.icon+'"></i>'+p.label+'</span>';
+        });
+        var adoptionCount = a.products.filter(function(p){return p && p!=='UNKNOWN' && p!=='Register POS' && p!=='Register Terminal';}).length;
+        var adoptionLabel = adoptionCount > 0 ? adoptionCount + ' active product' + (adoptionCount>1?'s':'') : 'No add-on products — upsell opportunity';
+        return '<div style="background:var(--bg3);border-radius:6px;padding:12px;margin-top:12px;">' +
+          '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">Product Adoption <span style="text-transform:none;letter-spacing:0;color:'+(adoptionCount>0?'var(--green)':'var(--yellow)')+';">— '+adoptionLabel+'</span></div>' +
+          '<div class="product-grid">' + pills + '</div>' +
+        '</div>';
+      })() +
+      
+      // Similar Sellers
+      similarSellersHtml(a) +
+      
+      // Action buttons
+      '<div style="display:flex;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid var(--border);flex-wrap:wrap;">' +
+        '<a class="detail-btn" href="' + sfUrl + '" target="_blank"><i class="fas fa-external-link-alt"></i>View in Salesforce</a>' +
+        '<button class="onepager-btn" onclick="copyOnePagerPrompt(\'' + a.name.replace(/'/g, "\\'") + '\', \'' + (a.sf||'') + '\', \'' + (a.bid||'') + '\')" title="Copy a Goose prompt to generate a full seller briefing"><i class="fas fa-file-alt"></i>Seller One-Pager</button>' +
+        '<a class="detail-btn secondary" href="#"><i class="fas fa-plus-circle"></i>Log Activity</a>' +
+        '<button class="detail-btn secondary" onclick="closeModal()" style="margin-left:auto;"><i class="fas fa-times"></i>Close</button>' +
+      '</div>' +
+      
+    '</div>' +
+  '</div>';
+  
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  var overlay = document.getElementById('seller-modal-overlay');
+  if (overlay) {
+    overlay.style.animation = 'fadeOut .15s ease forwards';
+    setTimeout(function(){ overlay.remove(); document.body.style.overflow = ''; }, 150);
+  }
+}
+
+// Close on Escape key
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeModal();
+});
+
+function exportCSV() {
+  const list = getFilteredAccounts();
+  const amFullNames = { antony:'Antony Haddrick', simran:'Simran Sandhu', pascale:'Pascale Dexter', liv:'Liv McDonald', mitch:'Mitch Langdon', victoria:'Victoria Fabian', eitan:'Eitan Dankner', elena:'Elena Kingham', emily:'Emily Desmond' };
+  const tierNames = { 1:'Tier 1', 2:'Tier 2', 3:'Tier 3' };
+  let csv = 'Business Name,AM,Category,GPV Tier,Annualized GPV (A$M),YoY Growth %,Days Since Activity,Health Score,Risk Status\n';
+  list.forEach(a => {
+    const name = '"' + a.name.replace(/"/g, '""') + '"';
+    csv += [name, amFullNames[a.am]||a.am, a.cat, tierNames[a.tier], a.gpv.toFixed(1), a.yoy, a.days, a.health, a.risk].join(',') + '\n';
+  });
+  const blob = new Blob([csv], { type:'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'am_portfolio_2026-03-04.csv';
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+let currentRangeMultiplier = 1;
+function setRange(mult, btn) {
+  currentRangeMultiplier = mult;
+  document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderActivityBars();
+}
+
+// Override renderActivityBars
+const _origRenderActivityBars = renderActivityBars;
+renderActivityBars = function() {
+  const container = document.getElementById('activityBars');
+  const mult = currentRangeMultiplier;
+  let filtered = weeklyActivity;
+  if (currentAM !== 'all') {
+    filtered = weeklyActivity.filter(a => a.key === currentAM);
+  }
+  const scaledData = filtered.map(a => ({
+    ...a,
+    calls: Math.round(a.calls * mult * (0.9 + Math.random()*0.2)),
+    email: Math.round(a.email * mult * (0.85 + Math.random()*0.3)),
+    sms: Math.round(a.sms * mult * (0.8 + Math.random()*0.4)),
+    total: Math.round(a.total * mult * (0.9 + Math.random()*0.2))
+  }));
+  const maxTotal = Math.max(...scaledData.map(a=>a.total), 1);
+  container.innerHTML = scaledData.map(a => {
+    const cw = (a.calls/maxTotal)*100;
+    const ew = (a.email/maxTotal)*100;
+    const sw = (a.sms/maxTotal)*100;
+    return '<div class="activity-row">' +
+      '<div class="activity-label">'+a.name+'</div>' +
+      '<div class="activity-bar-wrap">' +
+        '<div class="activity-seg calls" style="width:'+cw+'%;transition:width .4s;" title="Calls: '+a.calls+'"></div>' +
+        '<div class="activity-seg email" style="width:'+ew+'%;transition:width .4s;" title="Email: '+a.email+'"></div>' +
+        '<div class="activity-seg sms" style="width:'+sw+'%;transition:width .4s;" title="SMS: '+a.sms+'"></div>' +
+      '</div>' +
+      '<div class="activity-total">'+a.total+'</div>' +
+    '</div>';
+  }).join('');
+};
+
+// Populate AM dropdown from data
+(function populateAMSelect() {
+  const sel = document.getElementById('amSelect');
+  const allOpt = document.createElement('option');
+  allOpt.value = 'all';
+  allOpt.textContent = 'All Team — ' + tt.accts.toLocaleString() + ' accts • A$' + tt.gpv.toFixed(1) + 'M';
+  sel.appendChild(allOpt);
+  const amOrder = ['antony','simran','pascale','liv','mitch','victoria','eitan','elena','emily'];
+  amOrder.forEach(key => {
+    if (!amData[key]) return;
+    const d = amData[key];
+    const opt = document.createElement('option');
+    opt.value = key;
+    let label = d.name + ' — ' + d.accts.toLocaleString() + ' accts • A$' + d.gpv.toFixed(1) + 'M';
+    if (d.ramping) label += ' ⚡ RAMPING';
+    if (d.onLeave) label += ' 🏖 ON LEAVE';
+    opt.textContent = label;
+    sel.appendChild(opt);
+  });
+})();
+
+// Search from alert
+function searchAccount(name) {
+  document.getElementById('searchBox').value = name;
+  currentSearch = name;
+  currentFilter = 'all';
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('.filter-btn[data-filter="all"]').classList.add('active');
+  renderTable();
+  document.getElementById('tableScroll').scrollTop = 0;
+}
+
+// GPV by Category chart
+function renderCategoryChart() {
+  const container = document.getElementById('catChart');
+  if (!container) return;
+  let list = accounts;
+  if (currentAM !== 'all') list = list.filter(a => a.am === currentAM);
+  const catData = {};
+  list.forEach(a => {
+    if (!catData[a.cat]) catData[a.cat] = { gpv: 0, count: 0 };
+    catData[a.cat].gpv += a.gpv;
+    catData[a.cat].count++;
+  });
+  const sorted = Object.entries(catData).sort((a,b) => b[1].gpv - a[1].gpv);
+  const maxGpv = sorted.length ? sorted[0][1].gpv : 1;
+  const catColors = { food:'var(--orange)', retail:'var(--blue-light)', beauty:'#e91e63', services:'#ce93d8', fitness:'var(--green)', events:'var(--yellow)', drinks:'#00bcd4' };
+  container.innerHTML = sorted.map(([cat, d]) => {
+    const pct = (d.gpv / maxGpv * 100).toFixed(0);
+    const icon = catIcons[cat] || 'fa-circle';
+    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
+      '<span class="cat-icon cat-' + cat + '" style="flex-shrink:0;"><i class="fas ' + icon + '"></i></span>' +
+      '<div style="flex:1;">' +
+        '<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px;">' +
+          '<span style="color:var(--text2);text-transform:capitalize;">' + cat + ' <span style="color:var(--text3);">(' + d.count + ')</span></span>' +
+          '<span style="color:var(--text);font-weight:700;">A$' + d.gpv.toFixed(1) + 'M</span>' +
+        '</div>' +
+        '<div style="height:6px;background:var(--bg);border-radius:3px;overflow:hidden;">' +
+          '<div style="height:100%;width:' + pct + '%;background:' + (catColors[cat]||'var(--blue)') + ';border-radius:3px;transition:width .3s;"></div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// INIT
+renderKPIs();
+renderTable();
+renderAlerts();
+renderGPVChart();
+renderActivityBars();
+renderQTD();
+renderCategoryChart();
+
+// ===== RISK LEGEND =====
+function toggleRiskLegend() {
+  var box = document.getElementById("riskLegendBox");
+  var btn = document.getElementById("riskInfoToggle");
+  var isOpen = box.classList.contains("visible");
+  if (isOpen) {
+    box.classList.remove("visible");
+    btn.classList.remove("active");
+  } else {
+    box.classList.add("visible");
+    btn.classList.add("active");
+  }
+}
+
+// ===== SELLER ONE-PAGER =====
+function copyOnePagerPrompt(sellerName, sfdcId, businessId) {
+  var sellerIdLine = "Seller: " + sellerName;
+  if (businessId) sellerIdLine += " | BUSINESS_ID: " + businessId;
+  if (sfdcId) sellerIdLine += " | SFDC: " + sfdcId;
+
+  // Use BUSINESS_ID as primary key in all queries; fall back to SFDC name match
+  var bidFilter = businessId
+    ? "dao.BUSINESS_ID = '" + businessId + "'"
+    : "LOWER(aeo.BUSINESS_NAME) LIKE LOWER('%" + sellerName.replace(/'/g, "''") + "%')";
+  var bidFilterDirect = businessId
+    ? "act.BUSINESS_ID = '" + businessId + "'"
+    : "LOWER(act.BUSINESS_NAME) LIKE LOWER('%" + sellerName.replace(/'/g, "''") + "%')";
+  var bidFilterGpv = businessId
+    ? "gpv.BUSINESS_ID = '" + businessId + "'"
+    : "1=0 /* no BUSINESS_ID available — search by name in Step 1 first */";
+
+  var prompt = [
+    "Generate a Seller One-Pager for an AU SMB seller. You are a seller briefing generator for AU SMB Account Managers.",
+    "",
+    sellerIdLine,
+    "",
+    "## STEP 1: IDENTIFY THE SELLER",
+    "",
+    "```sql",
+    "SELECT",
+    "  aeo.BUSINESS_NAME, aeo.BUSINESS_ID,",
+    "  aeo.AM_SERVICE_LEVEL, aeo.SELLER_CLASS,",
+    "  ame.FIRST_NAME || ' ' || ame.LAST_NAME AS AM_NAME, ame.LDAP AS AM_LDAP",
+    "FROM app_merch_growth.app_merch_growth_etl.am_fact_account_ownership_v2 aeo",
+    "JOIN app_merch_growth.app_merch_growth_etl.am_fact_employment_current ame",
+    "  ON aeo.ACTIVE_OWNER_ID = ame.SFDC_OWNER_ID",
+    "WHERE ame.AM_TEAM = 'AU SMB' AND aeo.IS_ACTIVELY_MANAGED = 1",
+    "  AND aeo.BUSINESS_ID = '" + (businessId || "FILL_FROM_RESULTS") + "'",
+    "```",
+    "",
+    "Store the BUSINESS_ID for all subsequent queries.",
+    "",
+    "## STEP 2: PULL ALL DATA (run in parallel where possible)",
+    "",
+    "### 2a. Location",
+    "```sql",
+    "SELECT vu.RECEIPT_CITY, vu.RECEIPT_STATE, vu.RECEIPT_POSTAL_CODE,",
+    "  COUNT(DISTINCT CASE WHEN vu.IS_UNIT=1 AND vu.UNIT_ACTIVE_STATUS=TRUE THEN vu.BEST_AVAILABLE_UNIT_TOKEN END) AS active_locations",
+    "FROM app_bi.hexagon.vdim_user vu",
+    "JOIN app_merch_growth.public.dim_am_ownership dao ON vu.MERCHANT_TOKEN = dao.MERCHANT_TOKEN",
+    "WHERE " + bidFilter + " AND vu.IS_CURRENTLY_DEACTIVATED = 0",
+    "QUALIFY ROW_NUMBER() OVER (PARTITION BY dao.BUSINESS_ID ORDER BY vu.MERCHANT_LATEST_PAYMENT_DATE DESC NULLS LAST) = 1",
+    "```",
+    "",
+    "### 2b. Products",
+    "```sql",
+    "SELECT COALESCE(mpe.PRODUCT_PARENT_NAME, mpe.PRODUCT_NAME) AS product,",
+    "  MIN(mpe.EARLIEST_PRODUCT_REVENUE_EVENT_DATE) AS first_used,",
+    "  MAX(mpe.RECENT_PRODUCT_REVENUE_EVENT_DATE) AS last_used",
+    "FROM app_sales.app_sales_etl.merchant_product_events mpe",
+    "JOIN app_merch_growth.public.dim_am_ownership dao ON mpe.MERCHANT_TOKEN = dao.MERCHANT_TOKEN",
+    "WHERE " + bidFilter,
+    "GROUP BY 1 ORDER BY last_used DESC",
+    "```",
+    "",
+    "### 2c. AM Activities (last 6 months)",
+    "```sql",
+    "SELECT act.ACTIVITY_DATE, act.ACTIVITY_TYPE_GROUPED, act.SUBJECT,",
+    "  act.CALL_OUTCOME, act.IS_DM, ROUND(act.CALL_DURATION_SECONDS/60,1) AS call_mins, act.OWNER_NAME",
+    "FROM app_merch_growth.app_merch_growth_etl.am_fact_activities act",
+    "WHERE " + bidFilterDirect,
+    "  AND act.ACTIVITY_DATE >= DATEADD('month', -6, CURRENT_DATE())",
+    "  AND act.ACTIVITY_TYPE_GROUPED IN ('Call','Email','SMS','Field Visit','Google Meet','Slack')",
+    "ORDER BY act.ACTIVITY_DATE DESC LIMIT 20",
+    "```",
+    "",
+    "### 2d. Gong Call Summaries (last 12 months)",
+    "```sql",
+    "SELECT gc.METADATA_STARTED::DATE AS call_date, gc.METADATA_TITLE,",
+    "  ROUND(gc.METADATA_DURATION/60,1) AS duration_mins, gc.CONTENT_BRIEF AS call_summary,",
+    "  gc.CONTENT_HIGHLIGHTS AS highlights, gc.CONTENT_POINTSOFINTEREST_ACTIONITEMS AS action_items,",
+    "  gc.CONTENT_KEYPOINTS AS key_points, gc.CONTENT_TOPICS AS topics, gc.CONTENT_CALLOUTCOME AS outcome",
+    "FROM app_sales.gong.gong_detailed_calls gc",
+    "WHERE gc.METADATA_ID IN (",
+    "  SELECT DISTINCT act.SFDC_OBJECT_ID FROM app_merch_growth.app_merch_growth_etl.am_fact_activities act",
+    "  WHERE " + bidFilterDirect + " AND act.ACTIVITY_DATE >= DATEADD('month',-12,CURRENT_DATE())",
+    ") OR gc.METADATA_TITLE ILIKE '%" + sellerName.replace(/'/g, "''") + "%'",
+    "ORDER BY gc.METADATA_STARTED DESC LIMIT 10",
+    "```",
+    "If no Gong results, try via SFDC Account ID:" + (sfdcId ? "" : " (not available for this seller)"),
+    sfdcId ? [
+      "```sql",
+      "SELECT gconv.GONG_CALL_START::DATE AS call_date, gconv.GONG_TITLE,",
+      "  ROUND(gconv.GONG_CALL_DURATION_SEC/60,1) AS duration_mins,",
+      "  gc.CONTENT_BRIEF, gc.CONTENT_HIGHLIGHTS",
+      "FROM app_sales.app_salesforce.gong_conversations gconv",
+      "LEFT JOIN app_sales.gong.gong_detailed_calls gc ON gconv.GONG_CALL_ID = gc.CALL_ID::TEXT",
+      "WHERE gconv.GONG_PRIMARY_ACCOUNT = '" + sfdcId + "'",
+      "   OR gconv.RELATED_ACCOUNT_1 = '" + sfdcId + "'",
+      "   OR gconv.RELATED_ACCOUNT_2 = '" + sfdcId + "'",
+      "ORDER BY gconv.GONG_CALL_START DESC LIMIT 10",
+      "```"
+    ].join("\n") : "",
+    "",
+    "### 2e. CS Support Cases (last 12 months)",
+    "```sql",
+    "SELECT sc.CASE_CREATED_AT::DATE AS case_date, sc.CASE_STATUS, sc.ISSUE,",
+    "  sc.MACRO_LABEL AS category, sc.CASE_GROUP_NAME AS team",
+    "FROM app_merch_growth.app_merch_growth_etl.support_case_list sc",
+    "WHERE sc.MERCHANT_TOKEN IN (",
+    "  SELECT dao.MERCHANT_TOKEN FROM app_merch_growth.public.dim_am_ownership dao",
+    "  WHERE " + bidFilter,
+    ") AND sc.CASE_CREATED_AT >= DATEADD('month',-12,CURRENT_DATE())",
+    "ORDER BY sc.CASE_CREATED_AT DESC LIMIT 15",
+    "```",
+    "",
+    "### 2f. Churn Risk",
+    "```sql",
+    "SELECT cpw.PRED_PROB AS churn_probability, cpw.OUTREACH_PRIORITY_RANK,",
+    "  cpw.LAST_90D_GPV, cpw.LATEST_CSAT",
+    "FROM app_support.databricks_ml.churn_predictions_winback cpw",
+    "WHERE cpw.MERCHANT_TOKEN IN (",
+    "  SELECT dao.MERCHANT_TOKEN FROM app_merch_growth.public.dim_am_ownership dao",
+    "  WHERE " + bidFilter,
+    ") ORDER BY cpw.PRED_PROB DESC LIMIT 1",
+    "```",
+    "",
+    "### 2g. GPV Trend (quarterly, last 4 quarters)",
+    "```sql",
+    "SELECT gpv.OWNERSHIP_QTR, SUM(gpv.GPV_LP) AS gpv_current,",
+    "  SUM(gpv.GPV_LP_PRIOR_PERIOD) AS gpv_prior_period,",
+    "  SUM(gpv.GPV_LP_PRIOR_YEAR) AS gpv_prior_year",
+    "FROM am_analytics.am_analytics_etl.smb_varcomp_gpv gpv",
+    "WHERE " + bidFilterGpv,
+    "GROUP BY 1 ORDER BY 1 DESC LIMIT 4",
+    "```",
+    "",
+    "## STEP 3: FORMAT AS ONE-PAGER",
+    "",
+    "Use this structure:",
+    "# 🏢 [BUSINESS NAME] — Seller One-Pager",
+    "**Generated:** [today] | **AM:** [name] | **SFDC:** [link]",
+    "",
+    "Sections: Business Snapshot (table), GPV & Revenue (quarterly table), Products (list with first-used dates, flag dormant 90d+),",
+    "📞 Communication History (synthesize ALL Gong summaries into a narrative — themes, promises, concerns — then key points, action items, activity timeline table),",
+    "🎧 Support History (summarize patterns, list open cases),",
+    "💡 Recommended Talking Points (3-5 specific, data-backed conversation starters referencing actual past calls/data).",
+    "",
+    "## RULES",
+    "1. Conversation Summary is the MOST VALUABLE section — synthesize, don't list.",
+    "2. If no Gong data, say so and use activity subjects instead.",
+    "3. Always include SFDC link: https://squareinc.lightning.force.com/lightning/r/Account/" + (sfdcId || "SFDC_ID") + "/view",
+    "4. Talking points must reference specific data — not generic advice.",
+    "5. Flag anything concerning: open cases, declining GPV, high churn prob, long contact gaps, broken promises.",
+    "6. Keep it scannable — AM reads in 60 seconds, picks up the phone.",
+    "7. Currency is AUD. Filter AM_TEAM = 'AU SMB' where applicable."
+  ].join("\n");
+
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(prompt).then(function() {
+      var toast = document.createElement("div");
+      toast.className = "onepager-copied";
+      toast.innerHTML = '<i class="fas fa-check" style="margin-right:6px;"></i>Copied! Paste into Goose to generate one-pager';
+      document.body.appendChild(toast);
+      setTimeout(function() { toast.style.animation = "fadeOut .3s ease"; setTimeout(function() { toast.remove(); }, 300); }, 2500);
+    });
+  }
+}
+
+// ===== DATA AGENT PANEL =====
+function toggleAgentPanel() {
+  var panel = document.getElementById("agentPanel");
+  var fab = document.getElementById("agentFab");
+  var isOpen = panel.classList.contains("visible");
+  if (isOpen) {
+    panel.classList.remove("visible");
+    fab.classList.remove("open");
+    fab.innerHTML = '<i class="fas fa-robot"></i>';
+  } else {
+    panel.classList.add("visible");
+    fab.classList.add("open");
+    fab.innerHTML = '<i class="fas fa-plus"></i>';
+  }
+}
+
+function copyAgentQ(btn) {
+  var text = btn.textContent.trim();
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(function() {
+      var origBorder = btn.style.borderColor;
+      var origColor = btn.style.color;
+      btn.style.borderColor = "var(--green)";
+      btn.style.color = "var(--green)";
+      setTimeout(function() { btn.style.borderColor = ""; btn.style.color = ""; }, 1200);
+    });
+  }
+}
+
+function copyRecipeCmd() {
+  var code = document.getElementById("agentRecipeCmd").textContent;
+  var btn = document.querySelector(".agent-copy-btn");
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(code).then(function() {
+      btn.classList.add("copied");
+      btn.innerHTML = '<i class="fas fa-check"></i>';
+      setTimeout(function() {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<i class="fas fa-copy"></i>';
+      }, 2000);
+    });
+  }
+}
+
+</script>
+</body>
+</html>

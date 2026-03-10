@@ -1,0 +1,78 @@
+version: "1.0.0"
+title: "AU SMB Dashboard - Scheduled Daily Refresh"
+description: |
+  Daily refresh of AU SMB Portfolio Dashboard data at 8am AEDT.
+  Executes Snowflake queries and updates data.js and D1 database.
+
+extensions:
+  - type: stdio
+    name: queryexpert
+    cmd: uvx
+    args:
+      - mcp_query_expert@latest
+    timeout: 900
+    bundled: true
+    description: "Query Snowflake data"
+  - type: builtin
+    name: developer
+    timeout: 600
+    bundled: true
+    description: "Read/write files and execute commands"
+
+prompt: "Execute the AU SMB dashboard data refresh"
+
+instructions: |
+  Execute the AU SMB dashboard data refresh pipeline.
+  
+  ## GOAL
+  Update /Users/mbrown/Projects/am-portfolio-dashboard/build/client/data.js with fresh Snowflake data.
+  
+  ## PROCESS
+  
+  1. Read and execute each SQL query from /Users/mbrown/Projects/am-portfolio-dashboard/queries/
+     - 01_accounts.sql through 10_contracts.sql
+     - Use queryexpert__execute_query for each
+     - Store results in memory
+  
+  2. Join all results by BUSINESS_ID using Python
+  
+  3. Compute for each account:
+     - Health score (h): 0-100 based on GPV velocity, contact recency, products, contract, tenure
+     - Risk status (r): "healthy" (h≥65), "watch" (40≤h<65), "at_risk" (h<40)
+     - GPV tier (t): "Tier 1" (g≥1.0M), "Tier 2" (0.3M≤g<1.0M), "Tier 3" (g<0.3M)
+     - Days since DM (d): Days since last_dm_date, or 999 if null
+  
+  4. Generate alerts:
+     - Filter: r="at_risk" AND g>0.1M
+     - Sort by h (lowest first)
+     - Take top 30
+     - Generate contextual reasons
+  
+  5. Aggregate summaries:
+     - amSummary: metrics per AM
+     - teamTotal: team-level totals
+  
+  6. Write to data.js:
+     ```javascript
+     const DATA = {
+       accounts: [...],
+       alerts: [...],
+       qtd: {...},
+       weekly: [...],
+       gpvTrend: [...],
+       amSummary: {...},
+       teamTotal: {...},
+       featureNews: [...]  // preserve from existing
+     };
+     ```
+  
+  7. Report: total accounts, alerts, file size
+  
+  ## FILTERS
+  - AM_TEAM = 'AU SMB'
+  - IS_ACTIVELY_MANAGED = 1
+  - AM LDAP keys lowercase
+  - Currency: AUD
+  
+  ## ERROR HANDLING
+  If any query fails, log error and continue with remaining queries.

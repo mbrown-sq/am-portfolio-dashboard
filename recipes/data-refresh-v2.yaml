@@ -1,0 +1,89 @@
+version: "1.0.0"
+title: "AU SMB Dashboard Data Refresh v2"
+description: |
+  Refreshes the AU SMB Portfolio Dashboard by executing external SQL queries
+  and assembling data.js. Uses external files to avoid request size limits.
+
+extensions:
+  - type: stdio
+    name: queryexpert
+    cmd: uvx
+    args:
+      - mcp_query_expert@latest
+    timeout: 600
+    bundled: true
+    description: "Query Snowflake data"
+  - type: builtin
+    name: developer
+    timeout: 300
+    bundled: true
+    description: "Read/write files and execute commands"
+  - type: builtin
+    name: goose-sites
+    timeout: 300
+    bundled: true
+    description: "Deploy to goose-sites"
+
+prompt: "Run the AU SMB dashboard data refresh pipeline"
+
+instructions: |
+  Execute the AU SMB dashboard data refresh pipeline. Follow these steps:
+
+  ## SETUP
+  - Project root: /Users/mbrown/Projects/am-portfolio-dashboard
+  - Queries: queries/*.sql (10 files)
+  - Output: build/client/data.js
+
+  ## EXECUTION STEPS
+
+  1. **Execute Queries**
+     For each query file in queries/ (01-10), read the SQL and execute via queryexpert:
+     - 01_accounts.sql → base account list
+     - 02_gpv.sql → GPV metrics (annualized, 9mo, YoY)
+     - 03_ar.sql → AR data
+     - 04_activity.sql → activity metrics
+     - 05_qtd_metrics.sql → QTD AM metrics
+     - 06_weekly_activity.sql → weekly activity (last 5 weeks)
+     - 07_gpv_trend.sql → GPV trend (last 6 months)
+     - 08_products.sql → product adoption
+     - 09_locations.sql → location data
+     - 10_contracts.sql → contract status
+
+  2. **Process Results**
+     Use Python to join all results by BUSINESS_ID and compute:
+     - Health score (h): Use formula from scripts/refresh_data.py
+     - Risk status (r): "healthy" (h≥65), "watch" (h≥40), "at_risk" (h<40)
+     - GPV tier (t): Tier 1 (g≥1.0M), Tier 2 (g≥0.3M), Tier 3 (g<0.3M)
+     - Days since DM (d): DATEDIFF from last_dm_date, or 999 if null
+     - Category (c): Infer from business name or default to "services"
+
+  3. **Generate Alerts**
+     - Filter accounts where r="at_risk" AND g>0.1M
+     - Sort by health score (lowest first)
+     - Take top 30
+     - Generate contextual reasons using logic from scripts/refresh_data.py
+
+  4. **Assemble data.js**
+     Build the DATA object with:
+     - accounts: array of all account objects
+     - alerts: top 30 at-risk accounts
+     - qtd: QTD metrics by AM
+     - weekly: weekly activity data
+     - gpvTrend: 6-month trend
+     - amSummary: aggregated metrics per AM
+     - teamTotal: team-level totals
+     - featureNews: preserve from existing data.js
+
+  5. **Write & Deploy**
+     - Write to build/client/data.js as: const DATA = {...};
+     - Verify file size is 400KB-1MB
+     - Deploy: cd /Users/mbrown/Projects/am-portfolio-dashboard && goose-sites deploy am-portfolio-dashboard ./build -m "Data refresh $(date +%Y-%m-%d)"
+
+  ## IMPORTANT NOTES
+  - Currency: AUD (A$)
+  - AM_TEAM filter: 'AU SMB'
+  - IS_ACTIVELY_MANAGED = 1
+  - AM LDAP keys must be lowercase
+  - If any query fails, log error and continue with remaining queries
+  - Preserve featureNews array from existing data.js
+  - Set csv_path=None for all queries (load into memory, don't write CSV)

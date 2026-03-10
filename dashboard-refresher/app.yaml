@@ -1,0 +1,48 @@
+# App Manifest - Single source of truth for what this app is and what it can do
+# This file is uploaded with deployments and shared with services like kgoose
+
+# Identity
+app_id: dashboard-refresher
+name: dashboard-refresher
+description: A Block App Kit app  # Update this description
+owners:
+  - mbrown
+tags: []  # Add relevant tags: e.g., ["internal-tool", "research", "automation"]
+
+# Type and Runtime
+type: ui
+runtime: cloudflare-worker
+entrypoint: src/server/index.ts
+
+# Permissions
+# Add connections as you integrate with external services
+permissions:
+  connections: []  # e.g., ["slack", "airtable", "google_calendar"]
+  scopes: []       # e.g., ["slack.read", "airtable.write"]
+  resources: {}    # Optional: restrict to specific resources
+  # Example:
+  #   airtable:
+  #     bases: ["My Base"]
+  approval: auto   # "auto" or "required"
+
+# MCP Tools
+# Declare which MCP tools this app will invoke
+# Update this list as you add new integrations
+mcp_tools: []
+# Example:
+#   - name: send_message
+#     provider: slack
+#     required: true
+#     description: Send notifications to Slack channels
+
+# Execution (pipeline type only)
+# Uncomment and configure if this is a pipeline app
+# triggers:
+#   schedule: "0 9 * * MON"  # Cron expression
+#   manual: true
+# params_schema:
+#   type: object
+#   properties:
+#     dry_run:
+#       type: boolean
+#       default: false
